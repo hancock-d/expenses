@@ -1106,14 +1106,20 @@ function seedMonth(y,m){
   md.seeded=true;
   for(const t of RECUR){
     if(!t.active) continue;
-    md.expenses.push({
-      date:chargeDate(t.chargeDay,y,m),
-      desc:t.name+covStr(t,y,m),
-      cat:'Utilities & Bills',
-      paidBy:t.paidBy||'1',
-      amount:t.amount||'',
-      recurId:t.id
-    });
+    // Dedup guard — skip if recurId already exists in this month
+    if(!md.expenses.some(e=>e.recurId===t.id)){
+      md.expenses.push({
+        date:chargeDate(t.chargeDay,y,m),
+        desc:t.name+covStr(t,y,m),
+        cat:'Utilities & Bills',
+        paidBy:t.paidBy||'1',
+        amount:t.amount||'',
+        recurId:t.id
+      });
+      // Auto-skip if this month is inactive
+      const ams=t.activeMonths;
+      if(ams && ams[m]===0) md.skips[t.id]=true;
+    }
   }
   // Save seed to Firebase only — don't overwrite if Firebase already has this month
   if(window._fbSet){
