@@ -13,11 +13,8 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <!-- Firebase SDK -->
 <script type="module" id="fb-init">
-// ════════════════════════════════════════════════
-//  FIREBASE CONFIG — paste your config block here
-// ════════════════════════════════════════════════
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, getDocs }
+import { getFirestore, doc, getDoc, setDoc, onSnapshot }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -30,26 +27,51 @@ const firebaseConfig = {
 };
 
 const fbApp = initializeApp(firebaseConfig);
-const db    = getFirestore(fbApp);
+const db = getFirestore(fbApp);
 
-// Expose to main script via window
-window._db       = db;
-window._fbReady  = false;
-window._fbDoc    = (path) => doc(db, ...path.split('/'));
-window._fbSet    = async (path, data) => {
-  try { await setDoc(doc(db, ...path.split('/')), data, {merge:true}); return true; }
-  catch(e){ console.warn('FB write failed', e); return false; }
-};
-window._fbGet    = async (path) => {
-  try { const s=await getDoc(doc(db, ...path.split('/'))); return s.exists()?s.data():null; }
-  catch(e){ console.warn('FB read failed', e); return null; }
-};
-window._fbListen = (path, cb) => onSnapshot(doc(db, ...path.split('/')), snap => cb(snap.exists()?snap.data():null));
-window._fbListenCol = (path, cb) => onSnapshot(collection(db, ...path.split('/')), snap => {
-  const docs={}; snap.forEach(d=>docs[d.id]=d.data()); cb(docs);
-});
+// Helper: path string → Firestore doc ref (must have even segments)
+function dbDoc(path){
+  const parts = path.split('/');
+  return doc(db, parts[0], ...parts.slice(1));
+}
 
-// Signal that Firebase is ready
+window._db = db;
+
+window._fbSet = async (path, data) => {
+  try {
+    await setDoc(dbDoc(path), data, {merge:true});
+    return true;
+  } catch(e) {
+    console.error('FB write failed:', path, e.code, e.message);
+    return false;
+  }
+};
+
+window._fbGet = async (path) => {
+  try {
+    const s = await getDoc(dbDoc(path));
+    return s.exists() ? s.data() : null;
+  } catch(e) {
+    console.error('FB read failed:', path, e.code, e.message);
+    return null;
+  }
+};
+
+window._fbListen = (path, cb) => {
+  return onSnapshot(
+    dbDoc(path),
+    snap => cb(snap.exists() ? snap.data() : null),
+    err => console.error('FB listener error:', path, err.code, err.message)
+  );
+};
+
+// Run a test write to confirm Firebase is working
+async function testWrite() {
+  const ok = await window._fbSet('budget/meta', {_ping: Date.now()});
+  console.log('Firebase test write:', ok ? 'SUCCESS' : 'FAILED');
+}
+testWrite();
+
 window.dispatchEvent(new Event('fb-ready'));
 </script>
 <style>
@@ -971,8 +993,15 @@ async function saveMD(){
   const data=DB[k];
   // localStorage cache
   try{ localStorage.setItem('bgt_'+k,JSON.stringify(data)); }catch(e){}
-  // Firebase
-  if(window._fbSet){ setSyncing(); const ok=await window._fbSet('months/'+k,{data:JSON.stringify(data)}); ok?setSynced():setSyncError(); }
+  // Firebase — serialize the entire month as a JSON string in a single field
+  // This avoids any Firestore nesting/array issues
+  if(window._fbSet){
+    setSyncing();
+    const payload = {data: JSON.stringify(data), ts: Date.now()};
+    const ok = await window._fbSet('months/'+k, payload);
+    if(ok){ setSynced(); console.log('Saved month', k, 'to Firebase'); }
+    else{ setSyncError(); console.error('Failed to save month', k); }
+  }
 }
 
 // Load from Firebase on init, fall back to localStorage if offline
