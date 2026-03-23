@@ -1,6 +1,6 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
+<html lang="en"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="index_files/css2.css" rel="stylesheet">
 <!-- Firebase SDK -->
 <script type="module" id="fb-init">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -524,7 +524,7 @@ input[placeholder="Optional note…"]:focus {
 <body>
 
 <!-- ══ PIN SCREEN ══ -->
-<div id="pin-screen">
+<div id="pin-screen" style="display: none;">
   <h1>Family <span>Budget</span></h1>
   <p class="pin-subtitle" id="pin-subtitle">Enter your PIN to continue</p>
   <div class="pin-dots" id="pin-dots">
@@ -555,14 +555,14 @@ input[placeholder="Optional note…"]:focus {
 </div>
 
 <!-- ══ APP ══ -->
-<div id="app">
+<div id="app" class="unlocked">
   <header>
     <h1>Family <span>Budget</span></h1>
     <div class="hdr-right">
       <div class="month-nav">
-        <button id="prevMonth">&#8592;</button>
-        <div id="monthLabel">…</div>
-        <button id="nextMonth">&#8594;</button>
+        <button id="prevMonth">←</button>
+        <div id="monthLabel">March 2026</div>
+        <button id="nextMonth">→</button>
       </div>
       <div style="display:flex;align-items:center;gap:4px;"><div class="sync-dot" id="sync-dot"></div><span class="sync-label" id="sync-label">sync</span></div>
       <button class="lock-btn" onclick="lockApp()" title="Lock">🔒</button>
@@ -600,9 +600,9 @@ input[placeholder="Optional note…"]:focus {
         <div class="card-sub">after credits</div>
       </div>
       <div class="card balc" id="balCard">
-        <div class="card-label" id="lblbal">Balance</div>
+        <div class="card-label" id="lblbal">All Even ✓</div>
         <div class="card-value" id="vbal">$0.00</div>
-        <div class="carry-badge" id="carry-badge"></div>
+        <div class="carry-badge" id="carry-badge" style="display: none;"></div>
         <div class="settle-row">
           <button class="settle-btn mark" id="settle-btn" onclick="toggleSettle()">Mark Settled</button>
           <span class="card-sub" id="settle-note"></span>
@@ -623,14 +623,14 @@ input[placeholder="Optional note…"]:focus {
           <div class="zh-l">
             <span class="zone-icon" style="color:var(--rv)">↻</span>
             <span class="zone-lbl">Recurring Charges</span>
-            <span class="zpill" id="r-count">0</span>
+            <span class="zpill" id="r-count">1</span>
           </div>
           <div class="zh-r">
-            <span class="ztag" id="r-total">$0.00/mo</span>
-            <span class="zchev" id="r-chev">▼</span>
+            <span class="ztag" id="r-total">$2,745.00/mo</span>
+            <span class="zchev open" id="r-chev">▼</span>
           </div>
         </div>
-        <div class="zcollapse" id="r-body">
+        <div class="zcollapse open" id="r-body">
           <table class="rtable">
             <thead><tr>
               <th style="width:28px">✓</th>
@@ -645,7 +645,56 @@ input[placeholder="Optional note…"]:focus {
               <th>Notes</th>
               <th style="width:28px"></th>
             </tr></thead>
-            <tbody id="r-tbody"></tbody>
+            <tbody id="r-tbody"><tr>
+      <td style="text-align:center"><input type="checkbox" class="rtoggle" checked="checked" onchange="updRecurImm(0,'active',this.checked)"></td>
+      <td><input type="text" value="Mortgage" placeholder="e.g. Internet" onchange="updRecurImm(0,'name',this.value)"></td>
+      <td><select onchange="updRecurImm(0,'paidBy',this.value)">
+        <option value="1" selected="selected">Dave</option>
+        <option value="2">Lindsey</option>
+      </select></td>
+      <td class="rnum"><input type="number" value="2745" placeholder="0.00" min="0" step="0.01" onchange="updRecurImm(0,'amount',this.value)"></td>
+      <td class="rnum"><div class="ov-wrap">
+        <input type="number" placeholder="2745" min="0" step="0.01" title="Actual cost for March only — leave blank if same as usual" onchange="setOv('r1774291310475',this.value)">
+        
+      </div></td>
+      <td><select onchange="updRecurImm(0,'payment',this.value)">
+        <option value="">Select One</option>
+        <option value="Amex">Amex</option>
+        <option value="Chase">Chase</option>
+        <option value="Debit">Debit</option>
+        <option value="ACH" selected="selected">ACH</option>
+        <option value="Cash">Cash</option>
+        <option value="Check">Check</option>
+        <option value="Other">Other</option>
+      </select></td>
+      <td style="text-align:center"><input type="number" placeholder="25" min="1" max="31" style="width:46px;text-align:center" onchange="updRecurImm(0,'chargeDay',this.value)"></td>
+      <td>
+        <div class="cov-wrap">
+          <select onchange="updRecurImm(0,'covStartRef',this.value)" style="width:68px">
+            <option value="prev">prev</option>
+            <option value="curr" selected="selected">this</option>
+            <option value="next">next</option>
+          </select>
+          <select onchange="updRecurImm(0,'covStartDay',this.value)" style="width:52px"><option value="" selected="selected">Day</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option><option value="16">16</option><option value="17">17</option><option value="18">18</option><option value="19">19</option><option value="20">20</option><option value="21">21</option><option value="22">22</option><option value="23">23</option><option value="24">24</option><option value="25">25</option><option value="26">26</option><option value="27">27</option><option value="28">28</option><option value="29">29</option><option value="30">30</option><option value="31">31</option></select>
+          <span class="cov-sep"> – </span>
+          <select onchange="updRecurImm(0,'covEndRef',this.value)" style="width:68px">
+            <option value="prev">prev</option>
+            <option value="curr">this</option>
+            <option value="next" selected="selected">next</option>
+          </select>
+          <select onchange="updRecurImm(0,'covEndDay',this.value)" style="width:52px"><option value="" selected="selected">Day</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option><option value="16">16</option><option value="17">17</option><option value="18">18</option><option value="19">19</option><option value="20">20</option><option value="21">21</option><option value="22">22</option><option value="23">23</option><option value="24">24</option><option value="25">25</option><option value="26">26</option><option value="27">27</option><option value="28">28</option><option value="29">29</option><option value="30">30</option><option value="31">31</option></select>
+        </div>
+        
+        <div class="mo-strip">
+          <span class="mo-strip-label">Charged:</span>
+          <button type="button" class="mo-btn on " onclick="toggleActiveMo('r1774291310475',0,0)" title="January">J</button><button type="button" class="mo-btn on " onclick="toggleActiveMo('r1774291310475',0,1)" title="February">F</button><button type="button" class="mo-btn on curr-mo" onclick="toggleActiveMo('r1774291310475',0,2)" title="March">M</button><button type="button" class="mo-btn on " onclick="toggleActiveMo('r1774291310475',0,3)" title="April">A</button><button type="button" class="mo-btn on " onclick="toggleActiveMo('r1774291310475',0,4)" title="May">M</button><button type="button" class="mo-btn on " onclick="toggleActiveMo('r1774291310475',0,5)" title="June">J</button><button type="button" class="mo-btn on " onclick="toggleActiveMo('r1774291310475',0,6)" title="July">J</button><button type="button" class="mo-btn on " onclick="toggleActiveMo('r1774291310475',0,7)" title="August">A</button><button type="button" class="mo-btn on " onclick="toggleActiveMo('r1774291310475',0,8)" title="September">S</button><button type="button" class="mo-btn on " onclick="toggleActiveMo('r1774291310475',0,9)" title="October">O</button><button type="button" class="mo-btn on " onclick="toggleActiveMo('r1774291310475',0,10)" title="November">N</button><button type="button" class="mo-btn on " onclick="toggleActiveMo('r1774291310475',0,11)" title="December">D</button>
+        </div>
+      </td>
+      <td style="text-align:center">
+        <button class="skip-btn skip-on" onclick="toggleSkip('r1774291310475')" title="Override for this month only">Skip</button>
+      </td>
+      <td><input type="text" placeholder="Optional note…" onchange="updRecurImm(0,'notes',this.value)" style="min-width:120px"></td>
+      <td><button class="del-btn" onclick="delRecur(0)">✕</button></td></tr></tbody>
           </table>
           <div class="radd-row"><button class="radd-btn" onclick="addRecur()">+ Add Recurring Charge</button></div>
         </div>
@@ -661,10 +710,10 @@ input[placeholder="Optional note…"]:focus {
           </div>
           <div class="zh-r">
             <span class="ztag" id="c-total" style="border:1px solid var(--cb);color:var(--cv)">$0.00</span>
-            <span class="zchev" id="c-chev" style="color:var(--cv)">▼</span>
+            <span class="zchev open" id="c-chev" style="color:var(--cv)">▼</span>
           </div>
         </div>
-        <div class="zcollapse" id="c-body">
+        <div class="zcollapse open" id="c-body">
           <table class="ctable">
             <thead><tr>
               <th style="width:115px">Date</th>
@@ -677,7 +726,7 @@ input[placeholder="Optional note…"]:focus {
             </tr></thead>
             <tbody id="c-tbody"></tbody>
           </table>
-          <div id="c-empty" class="empty-state" style="display:none;background:var(--cbg);font-size:.82rem">No credits this month.</div>
+          <div id="c-empty" class="empty-state" style="display: block; background: var(--cbg); font-size: 0.82rem;">No credits this month.</div>
           <div class="cadd-row"><button class="cadd-btn" onclick="addCredit()">+ Add Credit / Refund</button></div>
         </div>
       </div>
@@ -700,14 +749,42 @@ input[placeholder="Optional note…"]:focus {
         </tr></thead>
         <tbody id="e-tbody"></tbody>
       </table>
-      <div id="e-empty" class="empty-state" style="display:none">No one-off expenses yet — tap <strong>+ Add Expense</strong>.</div>
+      <div id="e-empty" class="empty-state" style="display: block;">No one-off expenses yet — tap <strong>+ Add Expense</strong>.</div>
       
     </div>
 
     <!-- Categories -->
     <div class="cat-section">
       <h2>By Category</h2>
-      <div class="cat-grid" id="cat-grid"></div>
+      <div class="cat-grid" id="cat-grid">
+    <div class="cat-tile">
+      <div class="cat-name">Groceries / Household</div>
+      <div class="cat-amt">$0.00</div>
+    </div>
+    <div class="cat-tile">
+      <div class="cat-name">Utilities &amp; Bills</div>
+      <div class="cat-amt">$0.00</div>
+    </div>
+    <div class="cat-tile">
+      <div class="cat-name">Dining Out</div>
+      <div class="cat-amt">$0.00</div>
+    </div>
+    <div class="cat-tile">
+      <div class="cat-name">Kids / Childcare</div>
+      <div class="cat-amt">$0.00</div>
+    </div>
+    <div class="cat-tile">
+      <div class="cat-name">Home Improvement</div>
+      <div class="cat-amt">$0.00</div>
+    </div>
+    <div class="cat-tile">
+      <div class="cat-name">Entertainment</div>
+      <div class="cat-amt">$0.00</div>
+    </div>
+    <div class="cat-tile">
+      <div class="cat-name">Other</div>
+      <div class="cat-amt">$0.00</div>
+    </div></div>
     </div>
 
     <!-- History -->
@@ -717,12 +794,18 @@ input[placeholder="Optional note…"]:focus {
         <thead><tr>
           <th>Month</th>
           <th id="h1">Dave</th>
-          <th id="h2">Wife</th>
+          <th id="h2">Lindsey</th>
           <th>Balance</th>
           <th>Carryover</th>
           <th>Status</th>
         </tr></thead>
-        <tbody id="h-tbody"></tbody>
+        <tbody id="h-tbody"><tr>
+      <td style="font-family:DM Sans">March 2026</td>
+      <td>$0.00</td><td>$0.00</td>
+      <td>Even</td>
+      <td>—</td>
+      <td><span class="spill s-no">Open</span></td>
+    </tr></tbody>
       </table>
     </div>
   </main>
@@ -730,15 +813,15 @@ input[placeholder="Optional note…"]:focus {
   <!-- ══ PERSONAL PAGE OVERLAY ══ -->
   <div id="pers-overlay">
     <div class="pers-header">
-      <button class="pers-back" onclick="closePersonal()">&#8592;</button>
+      <button class="pers-back" onclick="closePersonal()">←</button>
       <div class="pers-header-title">
         <h2 id="pers-name">Dave</h2>
         <p>Personal Tracker — not shared with the joint budget</p>
       </div>
       <div class="pers-month-nav">
-        <button onclick="persChangeMonth(-1)">&#8592;</button>
+        <button onclick="persChangeMonth(-1)">←</button>
         <div id="pers-month-lbl">…</div>
-        <button onclick="persChangeMonth(1)">&#8594;</button>
+        <button onclick="persChangeMonth(1)">→</button>
         <button onclick="closePersonal()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:var(--cream);border-radius:8px;padding:5px 12px;font-family:'DM Sans',sans-serif;font-size:.75rem;font-weight:600;cursor:pointer;white-space:nowrap;margin-left:4px;" title="Return to joint tracker">⌂ Main</button>
       </div>
     </div>
@@ -834,7 +917,7 @@ input[placeholder="Optional note…"]:focus {
 
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast">↻ Synced</div>
 
 <script>
 /* ════════════════════════════════════════════════
@@ -1995,5 +2078,6 @@ document.getElementById('nextMonth').addEventListener('click',()=>changeMonth(1)
   startListeners();
 })();
 </script>
-</body>
-</html>
+
+
+</body></html>
