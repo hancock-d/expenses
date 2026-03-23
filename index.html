@@ -1514,7 +1514,17 @@ function updRecurImm(i,f,v){
 }
 // updRecur: saves only, no re-render — preserves focus while typing in text/number fields
 function updRecur(i,f,v){ RECUR[i][f]=v; saveMeta(); partialSummary(); }
-function delRecur(i){ RECUR.splice(i,1); saveMeta(); renderRecur(); }
+function delRecur(i){
+  const tid = RECUR[i].id;
+  RECUR.splice(i,1);
+  saveMeta();
+  // Remove the seeded expense from the current month
+  const md = getMD(Y,M);
+  const before = md.expenses.length;
+  md.expenses = md.expenses.filter(e => e.recurId !== tid);
+  if(md.expenses.length !== before){ saveMD(); }
+  render();
+}
 
 function toggleActiveMo(id,i,mi){
   const ams=(RECUR[i].activeMonths||[1,1,1,1,1,1,1,1,1,1,1,1]).slice();
