@@ -574,11 +574,11 @@ input[placeholder="Optional note…"]:focus {
     <div class="names-row">
       <div class="name-field">
         <span class="ndot" style="background:var(--p1)"></span>
-        Person 1: <input type="text" id="name1" value="Dave" oninput="saveNames();render()">
+        Person 1: <input type="text" id="name1" value="Dave" onchange="saveNames();render()">
       </div>
       <div class="name-field">
         <span class="ndot" style="background:var(--p2)"></span>
-        Person 2: <input type="text" id="name2" value="Lindsey" oninput="saveNames();render()">
+        Person 2: <input type="text" id="name2" value="Lindsey" onchange="saveNames();render()">
       </div>
     </div>
 
@@ -1394,7 +1394,7 @@ function renderExpenses(){
     const tr=document.createElement('tr');
     tr.innerHTML=`
       <td><input type="date" value="${e.date||''}" onchange="updExp(${i},'date',this.value)"></td>
-      <td><input type="text" value="${esc(e.desc||'')}" placeholder="Description" oninput="updExp(${i},'desc',this.value)"></td>
+      <td><input type="text" value="${esc(e.desc||'')}" placeholder="Description" onchange="updExp(${i},'desc',this.value)"></td>
       <td><select onchange="updExp(${i},'cat',this.value)">
         ${CATS.map(c=>`<option value="${c}" ${e.cat===c?'selected':''}>${c}</option>`).join('')}
       </select></td>
@@ -1412,7 +1412,7 @@ function renderExpenses(){
         <option value="Check" ${e.payment==='Check'?'selected':''}>Check</option>
         <option value="Other" ${e.payment==='Other'?'selected':''}>Other</option>
       </select></td>
-      <td class="anum"><input type="number" value="${e.amount||''}" placeholder="0.00" min="0" step="0.01" oninput="updExp(${i},'amount',this.value)"></td>
+      <td class="anum"><input type="number" value="${e.amount||''}" placeholder="0.00" min="0" step="0.01" onchange="updExp(${i},'amount',this.value)"></td>
       <td><input type="text" value="${esc(e.notes||'')}" placeholder="Optional note…" onchange="updExp(${i},'notes',this.value)" style="min-width:120px"></td>
       <td><button class="del-btn" onclick="delExp(${i})">✕</button></td>`;
     tbody.appendChild(tr);
