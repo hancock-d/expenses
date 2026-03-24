@@ -330,20 +330,23 @@ td.anum input{font-family:'DM Mono',monospace;font-weight:500;text-align:right;}
   /* Row 1: checkbox | name | delete */
   .rtable tbody td:nth-child(1){grid-row:1;grid-column:1;align-self:center;}
   .rtable tbody td:nth-child(2){grid-row:1;grid-column:2;}
-  .rtable tbody td:nth-child(11){grid-row:1;grid-column:3;text-align:right;}
-  /* Row 2: paid-by | usual cost */
+  .rtable tbody td:nth-child(12){grid-row:1;grid-column:3;text-align:right;}
+  /* Row 2: paid-by | category */
   .rtable tbody td:nth-child(3){grid-row:2;grid-column:1/2;}
   .rtable tbody td:nth-child(4){grid-row:2;grid-column:2/4;}
-  /* Row 3: actual cost | payment */
+  /* Row 3: usual cost | actual cost */
   .rtable tbody td:nth-child(5){grid-row:3;grid-column:1/2;}
   .rtable tbody td:nth-child(6){grid-row:3;grid-column:2/4;}
-  /* Row 4: charge day — inline label */
-  .rtable tbody td:nth-child(7){grid-row:4;grid-column:1/-1;}
-  /* Row 5: coverage full width — force inline */
-  .rtable tbody td:nth-child(8){grid-row:5;grid-column:1/-1;}
+  /* Row 4: payment | charge day */
+  .rtable tbody td:nth-child(7){grid-row:4;grid-column:1/2;}
+  .rtable tbody td:nth-child(8){grid-row:4;grid-column:2/4;}
+  /* Row 5: coverage full width */
+  .rtable tbody td:nth-child(9){grid-row:5;grid-column:1/-1;}
   /* Row 6: skip | notes */
-  .rtable tbody td:nth-child(9){grid-row:6;grid-column:1/2;}
-  .rtable tbody td:nth-child(10){grid-row:6;grid-column:2/4;}
+  .rtable tbody td:nth-child(10){grid-row:6;grid-column:1/2;}
+  .rtable tbody td:nth-child(11){grid-row:6;grid-column:2/4;}
+  /* delete button */
+  .rtable tbody td:nth-child(12){grid-row:1;grid-column:3;text-align:right;}
   /* Keep coverage dropdowns inline on mobile */
   .rtable .cov-wrap{display:flex;flex-wrap:nowrap;align-items:center;gap:3px;overflow-x:auto;}
   .rtable .cov-wrap select{flex-shrink:0;}
@@ -396,17 +399,29 @@ td.anum input{font-family:'DM Mono',monospace;font-weight:500;text-align:right;}
   display:flex;align-items:center;justify-content:center;flex-shrink:0;
 }
 .pers-back:hover{background:rgba(255,255,255,.2);}
-.pers-header-title{flex:1;}
-.pers-header-title h2{font-family:'DM Serif Display',serif;font-size:1.2rem;}
-.pers-header-title p{font-size:.72rem;opacity:.5;margin-top:1px;}
+.pers-header-title{flex:1;min-width:0;}
+.pers-header-title h2{font-family:'DM Serif Display',serif;font-size:1.2rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pers-header-title p{font-size:.72rem;opacity:.5;margin-top:1px;display:none;}
 .pers-month-nav{display:flex;align-items:center;gap:8px;}
 .pers-month-nav button{
   background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:var(--cream);
-  width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:.85rem;
-  display:flex;align-items:center;justify-content:center;
+  width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:.85rem;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
 }
 .pers-month-nav button:hover{background:rgba(255,255,255,.2);}
-#pers-month-lbl{font-family:'DM Serif Display',serif;font-size:.9rem;min-width:110px;text-align:center;}
+#pers-month-lbl{font-family:'DM Serif Display',serif;font-size:.9rem;min-width:100px;text-align:center;}
+.pers-main-btn{
+  background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:var(--cream);
+  border-radius:8px;padding:6px 12px;font-family:'DM Sans',sans-serif;
+  font-size:.75rem;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0;
+}
+.pers-main-btn:hover{background:rgba(255,255,255,.2);}
+@media(max-width:640px){
+  .pers-header{flex-wrap:wrap;gap:8px;padding:calc(10px + var(--safe-top)) 14px 10px;}
+  .pers-header-title h2{font-size:1rem;}
+  #pers-month-lbl{min-width:80px;font-size:.8rem;}
+  .pers-month-nav button{width:28px;height:28px;}
+}
 
 .pers-main{max-width:900px;margin:0 auto;padding:18px 14px calc(18px + var(--safe-bot));display:flex;flex-direction:column;gap:16px;width:100%;}
 
@@ -500,6 +515,20 @@ td.penum input{font-family:'DM Mono',monospace;font-weight:500;text-align:right;
 .sync-dot.offline{background:#888;}
 @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
 .sync-label{font-size:.62rem;color:rgba(255,255,255,.45);margin-left:4px;}
+
+
+/* ── PREVENT IOS ZOOM ON INPUT FOCUS ── */
+input, select, textarea {
+  font-size: 16px !important;
+}
+@media(min-width:641px){
+  input, select, textarea { font-size: inherit !important; }
+  .rtable td input, .rtable td select { font-size: .83rem !important; }
+  .etable td input, .etable td select { font-size: .875rem !important; }
+  .ctable td input, .ctable td select { font-size: .875rem !important; }
+  .psub-table td input, .psub-table td select { font-size: .83rem !important; }
+  .pexp-table td input, .pexp-table td select { font-size: .875rem !important; }
+}
 
 /* ── NOTES INPUT ── */
 input[placeholder="Optional note…"] {
@@ -614,7 +643,6 @@ input[placeholder="Optional note…"]:focus {
     <div class="section">
       <div class="sec-hdr">
         <h2>Expenses</h2>
-        <button class="add-btn" onclick="addExp()">+ Add Expense</button>
       </div>
 
       <!-- Recurring -->
@@ -634,8 +662,9 @@ input[placeholder="Optional note…"]:focus {
           <table class="rtable">
             <thead><tr>
               <th style="width:28px">✓</th>
-              <th style="min-width:140px">Name</th>
-              <th style="width:115px">Paid By</th>
+              <th>Name</th>
+              <th style="width:90px">Paid By</th>
+              <th style="width:140px">Category</th>
               <th style="width:90px">Usual Cost</th>
               <th style="width:105px">Actual Cost</th>
               <th style="width:110px">Payment</th>
@@ -651,6 +680,27 @@ input[placeholder="Optional note…"]:focus {
         </div>
       </div>
 
+      <!-- One-off expenses -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px 4px;background:var(--lg);border-top:1px solid var(--border);">
+        <span style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--slate);">One-Off Expenses</span>
+        <span id="oneoff-total-tag" style="font-family:'DM Mono',monospace;font-size:.72rem;color:var(--slate);background:white;border:1px solid var(--border);padding:2px 8px;border-radius:6px;">$0.00</span>
+      </div>
+      <table class="etable">
+        <thead><tr>
+          <th style="width:118px">Date</th>
+          <th>Description</th>
+          <th style="width:148px">Category</th>
+          <th style="width:148px">Paid By</th>
+          <th style="width:110px">Payment</th>
+          <th style="width:100px">Amount</th>
+          <th>Notes</th>
+          <th style="width:30px"></th>
+        </tr></thead>
+        <tbody id="e-tbody"></tbody>
+      </table>
+      <div id="e-empty" class="empty-state" style="display:none">No one-off expenses yet.</div>
+      <div style="padding:7px 12px;border-top:1px solid var(--border);background:var(--lg);"><button class="radd-btn" style="color:var(--slate);border-color:var(--border);" onclick="addExp()">+ Add Expense</button></div>
+      
       <!-- Credits -->
       <div class="czone">
         <div class="zone-hdr" onclick="toggleZone('c')">
@@ -682,26 +732,6 @@ input[placeholder="Optional note…"]:focus {
         </div>
       </div>
 
-      <!-- One-off expenses -->
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px 4px;background:var(--lg);border-top:1px solid var(--border);">
-        <span style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--slate);">One-Off Expenses</span>
-        <span id="oneoff-total-tag" style="font-family:'DM Mono',monospace;font-size:.72rem;color:var(--slate);background:white;border:1px solid var(--border);padding:2px 8px;border-radius:6px;">$0.00</span>
-      </div>
-      <table class="etable">
-        <thead><tr>
-          <th style="width:118px">Date</th>
-          <th>Description</th>
-          <th style="width:148px">Category</th>
-          <th style="width:148px">Paid By</th>
-          <th style="width:110px">Payment</th>
-          <th style="width:100px">Amount</th>
-          <th>Notes</th>
-          <th style="width:30px"></th>
-        </tr></thead>
-        <tbody id="e-tbody"></tbody>
-      </table>
-      <div id="e-empty" class="empty-state" style="display:none">No one-off expenses yet — tap <strong>+ Add Expense</strong>.</div>
-      
     </div>
 
     <!-- Categories -->
@@ -739,7 +769,7 @@ input[placeholder="Optional note…"]:focus {
         <button onclick="persChangeMonth(-1)">&#8592;</button>
         <div id="pers-month-lbl">…</div>
         <button onclick="persChangeMonth(1)">&#8594;</button>
-        <button onclick="closePersonal()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:var(--cream);border-radius:8px;padding:5px 12px;font-family:'DM Sans',sans-serif;font-size:.75rem;font-weight:600;cursor:pointer;white-space:nowrap;margin-left:4px;" title="Return to joint tracker">⌂ Main</button>
+        <button onclick="closePersonal()" class="pers-main-btn" title="Return to joint tracker">⌂ Main</button>
       </div>
     </div>
 
@@ -798,7 +828,7 @@ input[placeholder="Optional note…"]:focus {
         <!-- One-off personal expenses -->
         <div class="sec-hdr" style="border-top:1px solid var(--border)">
           <h3 style="font-family:'DM Serif Display',serif;font-size:.95rem">One-Off Expenses</h3>
-          <button class="add-btn" onclick="addPersExp()">+ Add Expense</button>
+          <span id="ps-exp-tag" style="font-family:'DM Mono',monospace;font-size:.72rem;color:var(--slate);background:white;border:1px solid var(--border);padding:2px 8px;border-radius:6px;">$0.00</span>
         </div>
         <table class="pexp-table">
           <thead><tr>
@@ -813,6 +843,7 @@ input[placeholder="Optional note…"]:focus {
           <tbody id="ps-exp-tbody"></tbody>
         </table>
         <div id="ps-exp-empty" class="empty-state" style="display:none">No one-off expenses yet.</div>
+        <div style="padding:7px 12px;border-top:1px solid var(--border);background:var(--lg);"><button class="psub-add-btn" onclick="addPersExp()">+ Add Expense</button></div>
       </div>
 
       <!-- History -->
@@ -1111,7 +1142,7 @@ function seedMonth(y,m){
       md.expenses.push({
         date:chargeDate(t.chargeDay,y,m),
         desc:t.name+covStr(t,y,m),
-        cat:'Utilities & Bills',
+        cat:t.cat||'Utilities & Bills',
         paidBy:t.paidBy||'1',
         amount:t.amount||'',
         recurId:t.id
@@ -1249,6 +1280,13 @@ function render(){
 function moOptions(sel){ return MOS.map((m,i)=>`<option value="${i}" ${i==sel?'selected':''}>${m}</option>`).join(''); }
 function dayOptions(sel){
   let o='<option value="">Day</option>';
+  // Cap at 28 for coverage dates (safe for all months including Feb)
+  for(let d=1;d<=28;d++) o+=`<option value="${d}" ${d==sel?'selected':''}>${d}</option>`;
+  return o;
+}
+// Charge day can go up to 31 (clamped at seeding time to actual month days)
+function chargeDayOptions(sel){
+  let o='<option value="">Day</option>';
   for(let d=1;d<=31;d++) o+=`<option value="${d}" ${d==sel?'selected':''}>${d}</option>`;
   return o;
 }
@@ -1275,6 +1313,9 @@ function renderRecur(){
         <option value="1" ${t.paidBy==='1'?'selected':''}>${name1}</option>
         <option value="2" ${t.paidBy==='2'?'selected':''}>${name2}</option>
       </select></td>
+      <td><select onchange="updRecurImm(${i},'cat',this.value)">
+        ${CATS.map(c=>`<option value="${c}" ${(t.cat||'Utilities & Bills')===c?'selected':''}>${c}</option>`).join('')}
+      </select></td>
       <td class="rnum"><input type="number" value="${esc(t.amount||'')}" placeholder="0.00" min="0" step="0.01"
             onchange="updRecurImm(${i},'amount',this.value)"></td>
       <td class="rnum"><div class="ov-wrap">
@@ -1293,9 +1334,9 @@ function renderRecur(){
         <option value="Check" ${t.payment==='Check'?'selected':''}>Check</option>
         <option value="Other" ${t.payment==='Other'?'selected':''}>Other</option>
       </select></td>
-      <td style="text-align:center"><input type="number" value="${esc(t.chargeDay||'')}" placeholder="25" min="1" max="31"
-            style="width:46px;text-align:center"
-            onchange="updRecurImm(${i},'chargeDay',this.value)"></td>
+      <td><select onchange="updRecurImm(${i},'chargeDay',this.value)" style="width:70px">
+        ${chargeDayOptions(t.chargeDay)}
+      </select></td>
       <td>
         <div class="cov-wrap">
           <select onchange="updRecurImm(${i},'covStartRef',this.value)" style="width:68px">
@@ -1845,6 +1886,7 @@ function updatePersTotals(who){
   const expTot=md.expenses.filter(e=>!e.isSubSeed).reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
   document.getElementById('ps-sub-total').textContent=fmt(subTot);
   document.getElementById('ps-exp-total').textContent=fmt(expTot);
+  const pstag=document.getElementById('ps-exp-tag'); if(pstag) pstag.textContent=fmt(expTot);
   document.getElementById('ps-grand-total').textContent=fmt(subTot+expTot);
 }
 
