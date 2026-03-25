@@ -1,0 +1,25 @@
+{
+  "name": "Expenses",
+  "short_name": "Expenses",
+  "description": "Family budget and expense tracker",
+  "start_url": "/expenses/",
+  "scope": "/expenses/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1A1410",
+  "theme_color": "#1A1410",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
