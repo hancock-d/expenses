@@ -396,6 +396,41 @@ td.anum input{font-family:'DM Mono',monospace;font-weight:500;text-align:left;}
 
   .cov-wrap{flex-wrap:wrap;}
   .names-row{gap:8px;}
+
+  /* ── Personal page mobile overrides ──
+     Personal rtable has 10 tds: 1=check 2=name 3=usual 4=actual 5=payment 6=chargeday 7=coverage 8=hidden 9=notes 10=delete
+     Personal etable has 7 tds: 1=date 2=desc 3=cat 4=payment 5=amount 6=notes 7=delete */
+  #pers-overlay .rtable tbody tr{
+    grid-template-columns:24px 1fr 1fr 24px;
+  }
+  /* Row 1: check | name spans 2-3 | delete */
+  #pers-overlay .rtable tbody td:nth-child(1){grid-row:1;grid-column:1;align-self:center;}
+  #pers-overlay .rtable tbody td:nth-child(2){grid-row:1;grid-column:2/4;}
+  #pers-overlay .rtable tbody td:nth-child(10){grid-row:1;grid-column:4;align-self:center;text-align:right;}
+  /* Row 2: usual cost | actual cost */
+  #pers-overlay .rtable tbody td:nth-child(3){grid-row:2;grid-column:2/3;}
+  #pers-overlay .rtable tbody td:nth-child(4){grid-row:2;grid-column:3/5;}
+  /* Row 3: payment full width */
+  #pers-overlay .rtable tbody td:nth-child(5){grid-row:3;grid-column:2/5;}
+  /* Row 4: charge day full width */
+  #pers-overlay .rtable tbody td:nth-child(6){grid-row:4;grid-column:2/5;}
+  /* Row 5: coverage full width */
+  #pers-overlay .rtable tbody td:nth-child(7){grid-row:5;grid-column:2/5;}
+  /* Hidden td */
+  #pers-overlay .rtable tbody td:nth-child(8){display:none;}
+  /* Row 6: notes full width */
+  #pers-overlay .rtable tbody td:nth-child(9){grid-row:6;grid-column:2/5;}
+
+  #pers-overlay .etable tbody tr{
+    grid-template-columns:1fr 24px;
+  }
+  #pers-overlay .etable tbody td:nth-child(1){grid-row:1;grid-column:1;}
+  #pers-overlay .etable tbody td:nth-child(7){grid-row:1;grid-column:2;align-self:center;text-align:right;}
+  #pers-overlay .etable tbody td:nth-child(2){grid-row:2;grid-column:1/-1;}
+  #pers-overlay .etable tbody td:nth-child(3){grid-row:3;grid-column:1/-1;}
+  #pers-overlay .etable tbody td:nth-child(4){grid-row:4;grid-column:1/-1;}
+  #pers-overlay .etable tbody td:nth-child(5){grid-row:5;grid-column:1/-1;}
+  #pers-overlay .etable tbody td:nth-child(6){grid-row:6;grid-column:1/-1;}
 }
 
 
@@ -462,50 +497,6 @@ td.anum input{font-family:'DM Mono',monospace;font-weight:500;text-align:left;}
 .pers-card-sm .card-label{font-size:.63rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--slate);margin-bottom:3px;}
 .pers-card-sm .card-value{font-family:'DM Mono',monospace;font-size:1.2rem;font-weight:500;line-height:1;}
 
-/* personal section shell */
-.pers-section{background:white;border-radius:12px;box-shadow:var(--sh);border:1px solid var(--border);overflow:hidden;}
-.pers-sec-hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--lg);}
-.pers-sec-hdr h3{font-family:'DM Serif Display',serif;font-size:.95rem;}
-
-/* personal subscriptions zone */
-.psub-zone{background:#FDF8F0;border-bottom:2px solid #E8D5A8;}
-.psub-hdr{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;cursor:pointer;user-select:none;}
-.psub-lbl{font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#9A6B1A;}
-.psub-icon{color:#9A6B1A;font-size:.9rem;}
-.psub-pill{background:#9A6B1A;color:white;font-size:.6rem;font-weight:700;padding:2px 7px;border-radius:10px;}
-.psub-tag{font-family:'DM Mono',monospace;font-size:.7rem;color:#9A6B1A;background:white;border:1px solid #E8D5A8;padding:2px 8px;border-radius:6px;}
-.psub-chev{color:#9A6B1A;font-size:.62rem;transition:transform .2s;display:inline-block;}
-.psub-chev.open{transform:rotate(180deg);}
-
-.psub-table{width:100%;border-collapse:collapse;}
-.psub-table thead th{font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#9A6B1A;padding:7px 10px;text-align:left;border-bottom:1px solid #E8D5A8;background:rgba(154,107,26,.05);white-space:nowrap;}
-.psub-table tbody tr{border-bottom:1px solid rgba(232,213,168,.4);}
-.psub-table tbody tr:last-child{border-bottom:none;}
-.psub-table tbody tr:hover{background:rgba(154,107,26,.03);}
-.psub-table tbody td{padding:6px 10px;font-size:.83rem;vertical-align:middle;}
-.psub-table td input,.psub-table td select{font-family:'DM Sans',sans-serif;font-size:.83rem;border:1px solid transparent;border-radius:5px;padding:3px 7px;background:transparent;color:var(--ink);width:100%;}
-.psub-table td input:hover,.psub-table td select:hover{border-color:#E8D5A8;background:white;}
-.psub-table td input:focus,.psub-table td select:focus{outline:none;border-color:#9A6B1A;background:white;}
-td.psnum input{font-family:'DM Mono',monospace;text-align:right;}
-.psub-inactive td{opacity:.38;}
-.psub-inactive td:first-child,.psub-inactive td:last-child{opacity:1;}
-.pstoggle{width:14px;height:14px;cursor:pointer;accent-color:#9A6B1A;}
-.psub-add-row{padding:7px 12px;border-top:1px solid #E8D5A8;background:rgba(154,107,26,.02);}
-.psub-add-btn{font-size:.72rem;font-weight:600;color:#9A6B1A;background:none;border:1px dashed #E8D5A8;border-radius:6px;padding:4px 12px;cursor:pointer;font-family:'DM Sans',sans-serif;}
-.psub-add-btn:hover{background:white;border-color:#9A6B1A;}
-
-/* personal expense table */
-.pexp-table{width:100%;border-collapse:collapse;}
-.pexp-table thead th{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--slate);padding:9px 12px;text-align:left;border-bottom:1px solid var(--border);background:var(--lg);}
-.pexp-table tbody tr{border-bottom:1px solid var(--lg);}
-.pexp-table tbody tr:last-child{border-bottom:none;}
-.pexp-table tbody tr:hover{background:#FDFAF6;}
-.pexp-table tbody td{padding:8px 12px;font-size:.875rem;vertical-align:middle;}
-.pexp-table td input,.pexp-table td select{font-family:'DM Sans',sans-serif;font-size:.875rem;border:1px solid transparent;border-radius:5px;padding:3px 7px;background:transparent;color:var(--ink);width:100%;}
-.pexp-table td input:hover,.pexp-table td select:hover{border-color:var(--border);background:var(--lg);}
-.pexp-table td input:focus,.pexp-table td select:focus{outline:none;border-color:var(--slate);background:white;}
-td.penum input{font-family:'DM Mono',monospace;font-weight:500;text-align:left;}
-
 /* personal history */
 .phist-table{width:100%;border-collapse:collapse;}
 .phist-table th{font-size:.63rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--slate);padding:6px 10px;text-align:left;border-bottom:1px solid var(--border);}
@@ -513,20 +504,7 @@ td.penum input{font-family:'DM Mono',monospace;font-weight:500;text-align:left;}
 .phist-table tr:last-child td{border-bottom:none;}
 
 @media(max-width:640px){
-  .pers-summary{grid-template-columns:1fr 1fr;}
-  .pexp-table thead{display:none;}
-  .pexp-table tbody tr{display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;padding:10px 12px;border-bottom:2px solid var(--border)!important;}
-  .pexp-table tbody td{padding:2px 0;border:none;}
-  .pexp-table tbody td:nth-child(2){grid-column:1/-1;}
-  .pexp-table tbody td:last-child{grid-column:2;text-align:right;}
-  .psub-table thead{display:none;}
-  .psub-table tbody tr{display:grid;grid-template-columns:auto 1fr auto;gap:4px 8px;padding:8px 10px;border-bottom:2px solid #E8D5A8!important;}
-  .psub-table tbody td{padding:2px 0;border:none;}
-  .psub-table tbody td:nth-child(1){grid-row:1;grid-column:1;}
-  .psub-table tbody td:nth-child(2){grid-row:1;grid-column:2;}
-  .psub-table tbody td:last-child{grid-row:1;grid-column:3;}
-  .psub-table tbody td:nth-child(3),.psub-table tbody td:nth-child(4),
-  .psub-table tbody td:nth-child(5){grid-column:1/-1;}
+  #pers-overlay .summary-bar{grid-template-columns:1fr 1fr;}
   .pers-main{padding:12px 10px;}
 }
 
@@ -557,8 +535,6 @@ input, select, textarea {
   .rtable td input, .rtable td select { font-size: .83rem !important; }
   .etable td input, .etable td select { font-size: .875rem !important; }
   .ctable td input, .ctable td select { font-size: .875rem !important; }
-  .psub-table td input, .psub-table td select { font-size: .83rem !important; }
-  .pexp-table td input, .pexp-table td select { font-size: .875rem !important; }
 }
 
 /* ── ACTIVE MONTHS STRIP ── */
@@ -850,43 +826,51 @@ input[placeholder="Optional note…"]:focus {
         </div>
       </div>
 
-      <!-- Subscriptions -->
-      <div class="pers-section">
-        <div class="psub-zone">
-          <div class="psub-hdr" onclick="togglePersZone()">
+      <!-- Expenses section — mirrors main page structure -->
+      <div class="section">
+        <div class="sec-hdr">
+          <h2>Expenses</h2>
+        </div>
+
+        <!-- Recurring Subscriptions (purple zone, same as main) -->
+        <div class="rzone">
+          <div class="zone-hdr" onclick="togglePersZone()">
             <div class="zh-l">
-              <span class="psub-icon">↻</span>
-              <span class="psub-lbl">Recurring Subscriptions</span>
-              <span class="psub-pill" id="ps-sub-cnt">0</span>
+              <span class="zone-icon" style="color:var(--rv)">↻</span>
+              <span class="zone-lbl">Recurring Subscriptions</span>
+              <span class="zpill" id="ps-sub-cnt">0</span>
             </div>
             <div class="zh-r">
-              <span class="psub-tag" id="ps-sub-tag">$0.00/mo</span>
-              <span class="psub-chev" id="ps-sub-chev">▼</span>
+              <span class="ztag" id="ps-sub-tag">$0.00/mo</span>
+              <span class="zchev" id="ps-sub-chev">▼</span>
             </div>
           </div>
           <div class="zcollapse open" id="ps-sub-body">
-            <table class="psub-table">
+            <table class="rtable">
               <thead><tr>
                 <th style="width:28px">✓</th>
-                <th>Name</th>
+                <th style="min-width:160px">Name</th>
                 <th style="width:90px">Usual Cost</th>
                 <th style="width:105px">Actual Cost</th>
                 <th style="width:110px">Payment</th>
+                <th style="width:62px">Charge Day</th>
+                <th>Coverage <span style="opacity:.5;font-weight:400;font-style:italic;font-size:.55rem">relative to viewed month</span></th>
+                <th style="width:70px">Skip</th>
                 <th>Notes</th>
                 <th style="width:28px"></th>
               </tr></thead>
               <tbody id="ps-sub-tbody"></tbody>
             </table>
-            <div class="psub-add-row"><button class="psub-add-btn" onclick="addPersSub()">+ Add Subscription</button></div>
+            <div class="radd-row"><button class="radd-btn" onclick="addPersSub()">+ Add Subscription</button></div>
           </div>
         </div>
 
-        <!-- One-off personal expenses -->
-        <div class="sec-hdr" style="border-top:1px solid var(--border)">
-          <h3 style="font-family:'DM Serif Display',serif;font-size:.95rem">Other Expenses</h3>
+        <!-- Other Expenses (same header bar as main) -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px 4px;background:var(--lg);border-top:1px solid var(--border);">
+          <span style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--slate);">Other Expenses</span>
           <span id="ps-exp-tag" style="font-family:'DM Mono',monospace;font-size:.72rem;color:var(--slate);background:white;border:1px solid var(--border);padding:2px 8px;border-radius:6px;">$0.00</span>
         </div>
-        <table class="pexp-table">
+        <table class="etable">
           <thead><tr>
             <th style="width:118px">Date</th>
             <th>Description</th>
@@ -899,9 +883,9 @@ input[placeholder="Optional note…"]:focus {
           <tbody id="ps-exp-tbody"></tbody>
         </table>
         <div id="ps-exp-empty" class="empty-state" style="display:none">No other expenses yet.</div>
-        <div style="padding:7px 12px;border-top:1px solid var(--border);background:var(--lg);"><button class="psub-add-btn" onclick="addPersExp()">+ Add Expense</button></div>
+        <div style="padding:7px 12px;border-top:1px solid var(--border);background:var(--lg);"><button class="radd-btn" style="color:var(--slate);border-color:var(--border);" onclick="addPersExp()">+ Add Expense</button></div>
 
-        <!-- Personal Credits & Refunds -->
+        <!-- Credits & Refunds (green zone, same as main) -->
         <div class="czone">
           <div class="zone-hdr" onclick="togglePersCreditZone()">
             <div class="zh-l">
@@ -930,6 +914,7 @@ input[placeholder="Optional note…"]:focus {
             <div class="cadd-row"><button class="cadd-btn" onclick="addPersCredit()">+ Add Credit / Refund</button></div>
           </div>
         </div>
+
       </div>
 
       <!-- History -->
@@ -1463,12 +1448,13 @@ function renderRecur(){
   setZone('r',rOpen);
 }
 
-function buildCovLabel(t){
+function buildCovLabel(t, viewM, viewY){
   const sd=parseInt(t.covStartDay), ed=parseInt(t.covEndDay);
   if(!sd||!ed) return '';
+  const cm=viewM!==undefined?viewM:M, cy=viewY!==undefined?viewY:Y;
   const sr=t.covStartRef||'curr', er=t.covEndRef||'next';
   function refMo(ref){
-    let mo=M, yr=Y;
+    let mo=cm, yr=cy;
     if(ref==='prev'){ mo--; if(mo<0){mo=11;yr--;} }
     if(ref==='next'){ mo++; if(mo>11){mo=0;yr++;} }
     return {mo,yr};
@@ -1806,8 +1792,10 @@ async function savePMeta(){
 function getPMD(who,y,m){
   const k=pmk(y,m);
   if(!PDB[who]) PDB[who]={};
-  if(!PDB[who][k]) PDB[who][k]={expenses:[],credits:[],seeded:false};
+  if(!PDB[who][k]) PDB[who][k]={expenses:[],credits:[],seeded:false,skips:{},overrides:{}};
   if(!PDB[who][k].credits) PDB[who][k].credits=[];
+  if(!PDB[who][k].skips) PDB[who][k].skips={};
+  if(!PDB[who][k].overrides) PDB[who][k].overrides={};
   return PDB[who][k];
 }
 async function savePMD(who){
@@ -1825,10 +1813,16 @@ function seedPersonalMonth(who,y,m){
   md.seeded=true;
   for(const t of (PSUBS[who]||[])){
     if(!t.active) continue;
-    md.expenses.push({
-      date:'',desc:t.name,cat:'Subscriptions',paidBy:who,
-      amount:t.amount||'',subId:t.id,isSubSeed:true
-    });
+    // Dedup guard
+    if(!md.expenses.some(e=>e.subId===t.id)){
+      md.expenses.push({
+        date:'',desc:t.name,cat:'Subscriptions',paidBy:who,
+        amount:t.amount||'',subId:t.id,isSubSeed:true
+      });
+      // Auto-skip if this month is inactive
+      const ams=t.activeMonths;
+      if(ams && ams[m]===0) md.skips[t.id]=true;
+    }
   }
   savePMD(who);
 }
@@ -1889,18 +1883,19 @@ function renderPersSubs(who){
   tbody.innerHTML='';
   let cnt=0, tot=0;
   (PSUBS[who]||[]).forEach((t,i)=>{
-    // find override in this month's seeded expense
+    const sk=!!(md.skips&&md.skips[t.id]);
     const seeded=md.expenses.find(e=>e.subId===t.id);
     const ov=seeded&&seeded.amount!==t.amount&&seeded.amount!==''?seeded.amount:'';
     const disp=ov!==''?ov:t.amount;
-    if(t.active){cnt++;tot+=parseFloat(disp)||0;}
+    if(t.active&&!sk){cnt++;tot+=parseFloat(disp)||0;}
     const tr=document.createElement('tr');
-    if(!t.active) tr.className='psub-inactive';
+    if(!t.active) tr.className='ri';
+    const covLabel=buildCovLabel(t,PM,PY);
     tr.innerHTML=`
-      <td style="text-align:center"><input type="checkbox" class="pstoggle" ${t.active?'checked':''} onchange="updPSub('${who}',${i},'active',this.checked)"></td>
-      <td><input type="text" value="${esc(t.name||'')}" placeholder="e.g. Netflix" onchange="updPSub('${who}',${i},'name',this.value)"></td>
-      <td class="psnum"><input type="number" value="${esc(t.amount||'')}" placeholder="Usual Cost" min="0" step="0.01" onchange="updPSub('${who}',${i},'amount',this.value)" title="Usual monthly cost"></td>
-      <td class="psnum"><div class="ov-wrap">
+      <td style="text-align:center"><input type="checkbox" class="rtoggle" ${t.active?'checked':''} onchange="updPSub('${who}',${i},'active',this.checked)"></td>
+      <td style="min-width:160px"><input type="text" value="${esc(t.name||'')}" placeholder="e.g. Netflix" onchange="updPSub('${who}',${i},'name',this.value)" style="min-width:140px"></td>
+      <td class="rnum"><input type="number" value="${esc(t.amount||'')}" placeholder="Usual Cost" min="0" step="0.01" onchange="updPSub('${who}',${i},'amount',this.value)" title="Usual monthly cost"></td>
+      <td class="rnum"><div class="ov-wrap">
         <input type="number" value="${esc(String(ov))}" placeholder="Override Cost" min="0" step="0.01"
           title="Actual cost this month — leave blank if same"
           onchange="setPersOv('${who}','${esc(t.id)}',this.value)">
@@ -1916,7 +1911,41 @@ function renderPersSubs(who){
         <option value="Check" ${t.payment==='Check'?'selected':''}>Check</option>
         <option value="Other" ${t.payment==='Other'?'selected':''}>Other</option>
       </select></td>
-      <td><input type="text" value="${esc(t.notes||'')}" placeholder="Optional note…" onchange="updPSub('${who}',${i},'notes',this.value)"></td>
+      <td><select onchange="updPSub('${who}',${i},'chargeDay',this.value)" style="width:100%">
+        ${chargeDayOptions(t.chargeDay)}
+      </select></td>
+      <td>
+        <div style="display:flex;flex-direction:column;gap:5px;">
+          <div style="display:flex;align-items:center;gap:4px;">
+            <span style="font-size:.65rem;font-weight:700;color:var(--rv);min-width:34px;flex-shrink:0;">From:</span>
+            <select onchange="updPSub('${who}',${i},'covStartRef',this.value)" style="flex:2;min-width:0;">
+              <option value="prev" ${(t.covStartRef||'curr')==='prev'?'selected':''}>Previous Month</option>
+              <option value="curr" ${(t.covStartRef||'curr')==='curr'?'selected':''}>This Month</option>
+              <option value="next" ${(t.covStartRef||'curr')==='next'?'selected':''}>Next Month</option>
+            </select>
+            <select onchange="updPSub('${who}',${i},'covStartDay',this.value)" style="flex:1;min-width:0;">${dayOptions(t.covStartDay)}</select>
+          </div>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <span style="font-size:.65rem;font-weight:700;color:var(--rv);min-width:34px;flex-shrink:0;">To:</span>
+            <select onchange="updPSub('${who}',${i},'covEndRef',this.value)" style="flex:2;min-width:0;">
+              <option value="prev" ${(t.covEndRef||'next')==='prev'?'selected':''}>Previous Month</option>
+              <option value="curr" ${(t.covEndRef||'next')==='curr'?'selected':''}>This Month</option>
+              <option value="next" ${(t.covEndRef||'next')==='next'?'selected':''}>Next Month</option>
+            </select>
+            <select onchange="updPSub('${who}',${i},'covEndDay',this.value)" style="flex:1;min-width:0;">${dayOptions(t.covEndDay)}</select>
+          </div>
+        </div>
+        ${covLabel?`<div style="font-size:.65rem;color:var(--slate);margin-top:3px;">${covLabel}</div>`:''}
+        <div style="display:flex;align-items:center;gap:6px;margin-top:5px;">
+          <span class="mo-strip-label">Charged On:</span>
+          <button class="skip-btn ${sk?'skip-off':'skip-on'}" onclick="togglePersSkip('${who}','${esc(t.id)}')" title="Override for this month only" style="font-size:.6rem;padding:2px 7px;">${sk?'↺ Unskip':'Skip Month'}</button>
+        </div>
+        <div style="display:flex;flex-wrap:nowrap;gap:3px;margin-top:3px;overflow-x:auto;-webkit-overflow-scrolling:touch;">
+          ${(t.activeMonths||[1,1,1,1,1,1,1,1,1,1,1,1]).map((on,mi)=>`<button type="button" class="mo-btn ${on?'on':''} ${mi===PM?'curr-mo':''}" onclick="togglePersActiveMo('${who}','${esc(t.id)}',${i},${mi})" title="${MO[mi]}">${MOS[mi][0]}</button>`).join('')}
+        </div>
+      </td>
+      <td style="display:none"></td>
+      <td><input type="text" value="${esc(t.notes||'')}" placeholder="Optional note…" onchange="updPSub('${who}',${i},'notes',this.value)" style="min-width:120px"></td>
       <td><button class="del-btn" onclick="delPSub('${who}',${i})">✕</button></td>`;
     tbody.appendChild(tr);
   });
@@ -1958,8 +1987,8 @@ function renderPersExps(who){
         <option value="Check" ${e.payment==='Check'?'selected':''}>Check</option>
         <option value="Other" ${e.payment==='Other'?'selected':''}>Other</option>
       </select></td>
-      <td class="penum"><input type="number" value="${e.amount||''}" placeholder="0.00" min="0" step="0.01" onchange="updPExpAmt('${who}',${ei},this.value)"></td>
-      <td><input type="text" value="${esc(e.notes||'')}" placeholder="Optional note…" onchange="updPExp('${who}',${ei},'notes',this.value)"></td>
+      <td class="anum"><input type="number" value="${e.amount||''}" placeholder="0.00" min="0" step="0.01" onchange="updPExpAmt('${who}',${ei},this.value)"></td>
+      <td><input type="text" value="${esc(e.notes||'')}" placeholder="Optional note…" onchange="updPExp('${who}',${ei},'notes',this.value)" style="min-width:120px"></td>
       <td><button class="del-btn" onclick="delPExp('${who}',${ei})">✕</button></td>`;
     tbody.appendChild(tr);
   });
@@ -1968,10 +1997,11 @@ function renderPersExps(who){
 
 function updatePersTotals(who){
   const md=getPMD(who,PY,PM);
-  // sub total from templates (active, with any override)
+  // sub total from templates (active + not skipped, with any override)
   let subTot=0;
   (PSUBS[who]||[]).forEach(t=>{
     if(!t.active) return;
+    if(md.skips&&md.skips[t.id]) return;
     const seeded=md.expenses.find(e=>e.subId===t.id);
     const ov=seeded&&seeded.amount!==''?seeded.amount:t.amount;
     subTot+=parseFloat(ov)||0;
@@ -2024,7 +2054,9 @@ function togglePersZone(){
 
 function addPersSub(){
   if(!PSUBS[persWho]) PSUBS[persWho]=[];
-  PSUBS[persWho].push({id:'ps'+Date.now(),name:'',amount:'',notes:'',active:true});
+  PSUBS[persWho].push({id:'ps'+Date.now(),name:'',amount:'',notes:'',active:true,
+    chargeDay:'',covStartRef:'curr',covStartDay:'',covEndRef:'next',covEndDay:'',
+    activeMonths:[1,1,1,1,1,1,1,1,1,1,1,1]});
   savePMeta(); renderPersSubs(persWho);
 }
 function updPSub(who,i,f,v){
@@ -2045,6 +2077,27 @@ function clearPersOv(who,id){
   const t=(PSUBS[who]||[]).find(s=>s.id===id);
   if(seeded&&t) seeded.amount=t.amount;
   savePMD(who); renderPersSubs(who);
+}
+
+function togglePersSkip(who,id){
+  const md=getPMD(who,PY,PM);
+  md.skips[id]=!md.skips[id];
+  savePMD(who); renderPersSubs(who);
+}
+
+function togglePersActiveMo(who,id,i,mi){
+  const ams=(PSUBS[who][i].activeMonths||[1,1,1,1,1,1,1,1,1,1,1,1]).slice();
+  ams[mi] = ams[mi] ? 0 : 1;
+  PSUBS[who][i].activeMonths=ams;
+  savePMeta();
+  // Update skip for current viewed month if this toggle affects it
+  if(mi===PM){
+    const md=getPMD(who,PY,PM);
+    if(ams[PM]===0) md.skips[id]=true;
+    else delete md.skips[id];
+    savePMD(who);
+  }
+  renderPersSubs(who);
 }
 
 function addPersExp(){
