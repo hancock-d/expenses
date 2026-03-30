@@ -197,7 +197,7 @@ main{max-width:1100px;margin:0 auto;padding:18px 14px calc(18px + var(--safe-bot
 .ztag{font-family:'DM Mono',monospace;font-size:.7rem;background:white;padding:2px 8px;border-radius:6px;}
 .zchev{font-size:.62rem;transition:transform .2s;display:inline-block;}
 .zchev.open{transform:rotate(180deg);}
-.zcollapse{display:none;}
+.zcollapse{display:none;overflow-x:auto;}
 .zcollapse.open{display:block;}
 
 /* RECURRING */
@@ -207,7 +207,7 @@ main{max-width:1100px;margin:0 auto;padding:18px 14px calc(18px + var(--safe-bot
 .rzone .zpill{background:var(--rv);color:white;}
 .rzone .ztag{border:1px solid var(--rb);color:var(--rv);}
 
-.rtable{width:100%;border-collapse:collapse;}
+.rtable{width:100%;border-collapse:collapse;min-width:1200px;}
 .rtable thead th{font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--rv);padding:7px 10px;text-align:left;border-bottom:1px solid var(--rb);background:rgba(107,79,187,.05);white-space:nowrap;}
 .rtable tbody tr{border-bottom:1px solid rgba(197,184,232,.35);}
 .rtable tbody tr:last-child{border-bottom:none;}
@@ -331,7 +331,8 @@ td.anum input{font-family:'DM Mono',monospace;font-weight:500;text-align:left;}
 
   /* Recurring mobile — compact card layout
      td order: 1=check 2=name 3=paidby 4=cat 5=usual 6=actual
-               7=payment 8=chargeday 9=coverage(+mo-strip+skip) 10=hidden 11=notes 12=delete */
+               7=payment 8=chargeday 9=coverage(+mo-strip+skip) 10=notes 11=delete */
+  .rtable{min-width:0;}
   .rtable thead{display:none;}
   .rtable tbody tr{
     display:grid;
@@ -343,7 +344,7 @@ td.anum input{font-family:'DM Mono',monospace;font-weight:500;text-align:left;}
   /* Row 1: check | name spans cols 2-3 | delete */
   .rtable tbody td:nth-child(1){grid-row:1;grid-column:1;align-self:center;}
   .rtable tbody td:nth-child(2){grid-row:1;grid-column:2/4;}
-  .rtable tbody td:nth-child(12){grid-row:1;grid-column:4;align-self:center;text-align:right;}
+  .rtable tbody td:nth-child(11){grid-row:1;grid-column:4;align-self:center;text-align:right;}
   /* Row 2: paid-by full width */
   .rtable tbody td:nth-child(3){grid-row:2;grid-column:2/5;}
   /* Row 3: category full width */
@@ -357,10 +358,8 @@ td.anum input{font-family:'DM Mono',monospace;font-weight:500;text-align:left;}
   .rtable tbody td:nth-child(8){grid-row:6;grid-column:2/5;}
   /* Row 7: coverage full width indented */
   .rtable tbody td:nth-child(9){grid-row:7;grid-column:2/5;}
-  /* Hidden td */
-  .rtable tbody td:nth-child(10){display:none;}
   /* Row 8: notes full width indented */
-  .rtable tbody td:nth-child(11){grid-row:8;grid-column:2/5;}
+  .rtable tbody td:nth-child(10){grid-row:8;grid-column:2/5;}
   /* Coverage dropdowns inline */
   .rtable .cov-wrap{display:flex;flex-wrap:nowrap;align-items:center;gap:4px;}
   .rtable .cov-wrap select{flex-shrink:0;}
@@ -398,7 +397,7 @@ td.anum input{font-family:'DM Mono',monospace;font-weight:500;text-align:left;}
   .names-row{gap:8px;}
 
   /* ── Personal page mobile overrides ──
-     Personal rtable has 10 tds: 1=check 2=name 3=usual 4=actual 5=payment 6=chargeday 7=coverage 8=hidden 9=notes 10=delete
+     Personal rtable has 9 tds: 1=check 2=name 3=usual 4=actual 5=payment 6=chargeday 7=coverage 8=notes 9=delete
      Personal etable has 7 tds: 1=date 2=desc 3=cat 4=payment 5=amount 6=notes 7=delete */
   #pers-overlay .rtable tbody tr{
     grid-template-columns:24px 1fr 1fr 24px;
@@ -406,7 +405,7 @@ td.anum input{font-family:'DM Mono',monospace;font-weight:500;text-align:left;}
   /* Row 1: check | name spans 2-3 | delete */
   #pers-overlay .rtable tbody td:nth-child(1){grid-row:1;grid-column:1;align-self:center;}
   #pers-overlay .rtable tbody td:nth-child(2){grid-row:1;grid-column:2/4;}
-  #pers-overlay .rtable tbody td:nth-child(10){grid-row:1;grid-column:4;align-self:center;text-align:right;}
+  #pers-overlay .rtable tbody td:nth-child(9){grid-row:1;grid-column:4;align-self:center;text-align:right;}
   /* Row 2: usual cost | actual cost */
   #pers-overlay .rtable tbody td:nth-child(3){grid-row:2;grid-column:2/3;}
   #pers-overlay .rtable tbody td:nth-child(4){grid-row:2;grid-column:3/5;}
@@ -416,10 +415,8 @@ td.anum input{font-family:'DM Mono',monospace;font-weight:500;text-align:left;}
   #pers-overlay .rtable tbody td:nth-child(6){grid-row:4;grid-column:2/5;}
   /* Row 5: coverage full width */
   #pers-overlay .rtable tbody td:nth-child(7){grid-row:5;grid-column:2/5;}
-  /* Hidden td */
-  #pers-overlay .rtable tbody td:nth-child(8){display:none;}
   /* Row 6: notes full width */
-  #pers-overlay .rtable tbody td:nth-child(9){grid-row:6;grid-column:2/5;}
+  #pers-overlay .rtable tbody td:nth-child(8){grid-row:6;grid-column:2/5;}
 
   #pers-overlay .etable tbody tr{
     grid-template-columns:1fr 24px;
@@ -489,7 +486,7 @@ td.anum input{font-family:'DM Mono',monospace;font-weight:500;text-align:left;}
   .pers-month-nav button{width:28px;height:28px;}
 }
 
-.pers-main{max-width:900px;margin:0 auto;padding:18px 14px calc(18px + var(--safe-bot));display:flex;flex-direction:column;gap:16px;width:100%;}
+.pers-main{max-width:1100px;margin:0 auto;padding:18px 14px calc(18px + var(--safe-bot));display:flex;flex-direction:column;gap:16px;width:100%;}
 
 /* summary strip */
 .pers-summary{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
@@ -697,7 +694,6 @@ input[placeholder="Optional note…"]:focus {
               <th style="width:110px">Payment</th>
               <th style="width:62px">Charge Day</th>
               <th>Coverage <span style="opacity:.5;font-weight:400;font-style:italic;font-size:.55rem">relative to viewed month</span></th>
-              <th style="width:70px">Skip</th>
               <th>Notes</th>
               <th style="width:28px"></th>
             </tr></thead>
@@ -855,7 +851,6 @@ input[placeholder="Optional note…"]:focus {
                 <th style="width:110px">Payment</th>
                 <th style="width:62px">Charge Day</th>
                 <th>Coverage <span style="opacity:.5;font-weight:400;font-style:italic;font-size:.55rem">relative to viewed month</span></th>
-                <th style="width:70px">Skip</th>
                 <th>Notes</th>
                 <th style="width:28px"></th>
               </tr></thead>
@@ -1438,7 +1433,6 @@ function renderRecur(){
           ${(t.activeMonths||[1,1,1,1,1,1,1,1,1,1,1,1]).map((on,mi)=>`<button type="button" class="mo-btn ${on?'on':''} ${mi===M?'curr-mo':''}" onclick="toggleActiveMo('${esc(t.id)}',${i},${mi})" title="${MO[mi]}">${MOS[mi][0]}</button>`).join('')}
         </div>
       </td>
-      <td style="display:none"></td>
       <td><input type="text" value="${esc(t.notes||'')}" placeholder="Optional note…" onchange="updRecurImm(${i},'notes',this.value)" style="min-width:120px"></td>
       <td><button class="del-btn" onclick="delRecur(${i})">✕</button></td>`;
     tbody.appendChild(tr);
@@ -1944,7 +1938,6 @@ function renderPersSubs(who){
           ${(t.activeMonths||[1,1,1,1,1,1,1,1,1,1,1,1]).map((on,mi)=>`<button type="button" class="mo-btn ${on?'on':''} ${mi===PM?'curr-mo':''}" onclick="togglePersActiveMo('${who}','${esc(t.id)}',${i},${mi})" title="${MO[mi]}">${MOS[mi][0]}</button>`).join('')}
         </div>
       </td>
-      <td style="display:none"></td>
       <td><input type="text" value="${esc(t.notes||'')}" placeholder="Optional note…" onchange="updPSub('${who}',${i},'notes',this.value)" style="min-width:120px"></td>
       <td><button class="del-btn" onclick="delPSub('${who}',${i})">✕</button></td>`;
     tbody.appendChild(tr);
