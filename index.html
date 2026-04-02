@@ -1426,8 +1426,7 @@ function renderRecur(){
         </div>
         ${covLabel?`<div style="font-size:.65rem;color:var(--slate);margin-top:3px;">${covLabel}</div>`:''}
         <div style="display:flex;align-items:center;gap:6px;margin-top:5px;">
-          <span class="mo-strip-label">Charged On:</span>
-          <button class="skip-btn ${sk?'skip-off':'skip-on'}" onclick="toggleSkip('${esc(t.id)}')" title="Override for this month only" style="font-size:.6rem;padding:2px 7px;">${sk?'↺ Unskip':'Skip Month'}</button>
+          <span class="mo-strip-label">Active:</span>
         </div>
         <div style="display:flex;flex-wrap:nowrap;gap:3px;margin-top:3px;overflow-x:auto;-webkit-overflow-scrolling:touch;">
           ${(t.activeMonths||[1,1,1,1,1,1,1,1,1,1,1,1]).map((on,mi)=>`<button type="button" class="mo-btn ${on?'on':''} ${mi===M?'curr-mo':''}" onclick="toggleActiveMo('${esc(t.id)}',${i},${mi})" title="${MO[mi]}">${MOS[mi][0]}</button>`).join('')}
@@ -1803,11 +1802,10 @@ function pmk(y,m){ return `${y}-${String(m+1).padStart(2,'0')}`; }
 // ── Seed subscriptions into personal month ──
 function seedPersonalMonth(who,y,m){
   const md=getPMD(who,y,m);
-  if(md.seeded) return;
-  md.seeded=true;
+  let changed=false;
   for(const t of (PSUBS[who]||[])){
     if(!t.active) continue;
-    // Dedup guard
+    // Dedup guard — only add if this sub isn't already seeded
     if(!md.expenses.some(e=>e.subId===t.id)){
       md.expenses.push({
         date:'',desc:t.name,cat:'Subscriptions',paidBy:who,
@@ -1816,9 +1814,11 @@ function seedPersonalMonth(who,y,m){
       // Auto-skip if this month is inactive
       const ams=t.activeMonths;
       if(ams && ams[m]===0) md.skips[t.id]=true;
+      changed=true;
     }
   }
-  savePMD(who);
+  md.seeded=true;
+  if(changed) savePMD(who);
 }
 
 // ── Open / Close ─────────────────────────────
@@ -1931,8 +1931,7 @@ function renderPersSubs(who){
         </div>
         ${covLabel?`<div style="font-size:.65rem;color:var(--slate);margin-top:3px;">${covLabel}</div>`:''}
         <div style="display:flex;align-items:center;gap:6px;margin-top:5px;">
-          <span class="mo-strip-label">Charged On:</span>
-          <button class="skip-btn ${sk?'skip-off':'skip-on'}" onclick="togglePersSkip('${who}','${esc(t.id)}')" title="Override for this month only" style="font-size:.6rem;padding:2px 7px;">${sk?'↺ Unskip':'Skip Month'}</button>
+          <span class="mo-strip-label">Active:</span>
         </div>
         <div style="display:flex;flex-wrap:nowrap;gap:3px;margin-top:3px;overflow-x:auto;-webkit-overflow-scrolling:touch;">
           ${(t.activeMonths||[1,1,1,1,1,1,1,1,1,1,1,1]).map((on,mi)=>`<button type="button" class="mo-btn ${on?'on':''} ${mi===PM?'curr-mo':''}" onclick="togglePersActiveMo('${who}','${esc(t.id)}',${i},${mi})" title="${MO[mi]}">${MOS[mi][0]}</button>`).join('')}
