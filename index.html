@@ -1200,12 +1200,12 @@ function listenCurrentMonth(){
 ════════════════════════════════════════════════ */
 function seedMonth(y,m){
   const md=getMD(y,m);
-  if(md.seeded) return;
-  md.seeded=true;
+  let changed=false;
   for(const t of RECUR){
     if(!t.active) continue;
-    // Dedup guard — skip if recurId already exists in this month
-    if(!md.expenses.some(e=>e.recurId===t.id)){
+    const existing=md.expenses.find(e=>e.recurId===t.id);
+    if(!existing){
+      // Seed new entry
       md.expenses.push({
         date:chargeDate(t.chargeDay,y,m),
         desc:t.name+covStr(t,y,m),
@@ -1217,16 +1217,19 @@ function seedMonth(y,m){
       // Auto-skip if this month is inactive
       const ams=t.activeMonths;
       if(ams && ams[m]===0) md.skips[t.id]=true;
+      changed=true;
+    } else {
+      // Sync stale data — if seeded amount is empty but template has one, update it
+      if((!existing.amount || existing.amount==='') && t.amount){
+        existing.amount=t.amount; changed=true;
+      }
+      if(existing.paidBy!==t.paidBy && t.paidBy){
+        existing.paidBy=t.paidBy; changed=true;
+      }
     }
   }
-  // Save seed to Firebase only — don't overwrite if Firebase already has this month
-  if(window._fbSet){
-    window._fbGet('months/'+mk(y,m)).then(existing=>{
-      if(!existing||!existing.data) saveMD();
-    }).catch(()=>saveMD());
-  } else {
-    try{ localStorage.setItem('bgt_'+mk(y,m),JSON.stringify(getMD(y,m))); }catch(e){}
-  }
+  md.seeded=true;
+  if(changed) saveMD();
 }
 function chargeDate(day,y,m){
   const d=Math.min(parseInt(day)||1,new Date(y,m+1,0).getDate());
@@ -1264,9 +1267,15 @@ function calcMonth(y,m){
   let paid1=0, paid2=0;
 
   for(const e of md.expenses){
-    const a=parseFloat(e.amount)||0;
-    if(!a) continue;
     if(e.recurId&&md.skips[e.recurId]) continue;
+    let a=parseFloat(e.amount)||0;
+    // For recurring charges with no amount, fall back to override then template
+    if(!a && e.recurId){
+      const ov=md.overrides&&md.overrides[e.recurId];
+      if(ov!==undefined && ov!=='') a=parseFloat(ov)||0;
+      if(!a){ const t=RECUR.find(r=>r.id===e.recurId); if(t) a=parseFloat(t.amount)||0; }
+    }
+    if(!a) continue;
     if(e.paidBy==='1') paid1+=a;
     else if(e.paidBy==='2') paid2+=a;
   }
@@ -1805,8 +1814,8 @@ function seedPersonalMonth(who,y,m){
   let changed=false;
   for(const t of (PSUBS[who]||[])){
     if(!t.active) continue;
-    // Dedup guard — only add if this sub isn't already seeded
-    if(!md.expenses.some(e=>e.subId===t.id)){
+    const existing=md.expenses.find(e=>e.subId===t.id);
+    if(!existing){
       md.expenses.push({
         date:'',desc:t.name,cat:'Subscriptions',paidBy:who,
         amount:t.amount||'',subId:t.id,isSubSeed:true
@@ -1815,6 +1824,11 @@ function seedPersonalMonth(who,y,m){
       const ams=t.activeMonths;
       if(ams && ams[m]===0) md.skips[t.id]=true;
       changed=true;
+    } else {
+      // Sync stale data — if seeded amount is empty but template has one, update it
+      if((!existing.amount || existing.amount==='') && t.amount){
+        existing.amount=t.amount; changed=true;
+      }
     }
   }
   md.seeded=true;
@@ -2049,7 +2063,10 @@ function addPersSub(){
   PSUBS[persWho].push({id:'ps'+Date.now(),name:'',amount:'',notes:'',active:true,
     chargeDay:'',covStartRef:'curr',covStartDay:'',covEndRef:'next',covEndDay:'',
     activeMonths:[1,1,1,1,1,1,1,1,1,1,1,1]});
-  savePMeta(); renderPersSubs(persWho);
+  savePMeta();
+  // Seed the new sub into current month immediately
+  seedPersonalMonth(persWho,PY,PM);
+  renderPersSubs(persWho);
 }
 function updPSub(who,i,f,v){
   PSUBS[who][i][f]=v; savePMeta(); renderPersSubs(who);
