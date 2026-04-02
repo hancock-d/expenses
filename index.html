@@ -1563,7 +1563,15 @@ function renderCats(){
 
 function renderHistory(){
   const tbody=document.getElementById('h-tbody');
-  const keys=Object.keys(DB).sort().reverse();
+  // Build list of 12 months: current viewed month and 11 preceding
+  const months=[];
+  for(let i=0;i<12;i++){
+    let ym=M-i, yy=Y;
+    while(ym<0){ym+=12;yy--;}
+    months.push(mk(yy,ym));
+  }
+  // Filter to only months that have data
+  const keys=months.filter(k=>DB[k]);
   if(!keys.length){
     tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--slate);padding:14px;font-family:DM Sans;font-size:.85rem">No history yet.</td></tr>';
     return;
@@ -2025,7 +2033,14 @@ function updatePersTotals(who){
 
 function renderPersHist(who){
   const tbody=document.getElementById('ps-hist-tbody');
-  const keys=Object.keys(PDB[who]||{}).sort().reverse();
+  // Build list of 12 months: current personal viewed month and 11 preceding
+  const months=[];
+  for(let i=0;i<12;i++){
+    let ym=PM-i, yy=PY;
+    while(ym<0){ym+=12;yy--;}
+    months.push(pmk(yy,ym));
+  }
+  const keys=months.filter(k=>PDB[who]&&PDB[who][k]);
   if(!keys.length){
     tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--slate);padding:14px;font-family:DM Sans;font-size:.85rem">No history yet.</td></tr>';
     return;
@@ -2033,17 +2048,20 @@ function renderPersHist(who){
   tbody.innerHTML=keys.map(k=>{
     const md=PDB[who][k]; if(!md) return '';
     const[yr,mo]=k.split('-');
+    const m=parseInt(mo)-1;
+    // Calculate sub total from seeded expenses, respecting skips
     let subTot=0;
     (PSUBS[who]||[]).forEach(t=>{
       if(!t.active) return;
-      const seeded=md.expenses&&md.expenses.find(e=>e.subId===t.id);
-      const ov=seeded&&seeded.amount!==''?seeded.amount:t.amount;
-      subTot+=parseFloat(ov)||0;
+      if(md.skips&&md.skips[t.id]) return;
+      const seeded=(md.expenses||[]).find(e=>e.subId===t.id);
+      const amt=seeded&&seeded.amount!==''?seeded.amount:t.amount;
+      subTot+=parseFloat(amt)||0;
     });
     const expTot=(md.expenses||[]).filter(e=>!e.isSubSeed).reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
     const credTot=(md.credits||[]).reduce((s,c)=>s+(parseFloat(c.amount)||0),0);
     return`<tr>
-      <td style="font-family:DM Sans">${MO[parseInt(mo)-1]} ${yr}</td>
+      <td style="font-family:DM Sans">${MO[m]} ${yr}</td>
       <td>${fmt(subTot)}</td>
       <td>${fmt(expTot)}</td>
       <td style="color:var(--cv)">${credTot>0?'-':''}${fmt(credTot)}</td>
@@ -2064,34 +2082,33 @@ function addPersSub(){
     chargeDay:'',covStartRef:'curr',covStartDay:'',covEndRef:'next',covEndDay:'',
     activeMonths:[1,1,1,1,1,1,1,1,1,1,1,1]});
   savePMeta();
-  // Seed the new sub into current month immediately
   seedPersonalMonth(persWho,PY,PM);
-  renderPersSubs(persWho);
+  renderPersSubs(persWho); renderPersHist(persWho);
 }
 function updPSub(who,i,f,v){
-  PSUBS[who][i][f]=v; savePMeta(); renderPersSubs(who);
+  PSUBS[who][i][f]=v; savePMeta(); renderPersSubs(who); renderPersHist(who);
 }
 function delPSub(who,i){
-  PSUBS[who].splice(i,1); savePMeta(); renderPersSubs(who);
+  PSUBS[who].splice(i,1); savePMeta(); renderPersSubs(who); renderPersHist(who);
 }
 function setPersOv(who,id,val){
   const md=getPMD(who,PY,PM);
   const seeded=md.expenses.find(e=>e.subId===id);
   if(seeded) seeded.amount=val;
-  savePMD(who); renderPersSubs(who);
+  savePMD(who); renderPersSubs(who); renderPersHist(who);
 }
 function clearPersOv(who,id){
   const md=getPMD(who,PY,PM);
   const seeded=md.expenses.find(e=>e.subId===id);
   const t=(PSUBS[who]||[]).find(s=>s.id===id);
   if(seeded&&t) seeded.amount=t.amount;
-  savePMD(who); renderPersSubs(who);
+  savePMD(who); renderPersSubs(who); renderPersHist(who);
 }
 
 function togglePersSkip(who,id){
   const md=getPMD(who,PY,PM);
   md.skips[id]=!md.skips[id];
-  savePMD(who); renderPersSubs(who);
+  savePMD(who); renderPersSubs(who); renderPersHist(who);
 }
 
 function togglePersActiveMo(who,id,i,mi){
@@ -2099,14 +2116,13 @@ function togglePersActiveMo(who,id,i,mi){
   ams[mi] = ams[mi] ? 0 : 1;
   PSUBS[who][i].activeMonths=ams;
   savePMeta();
-  // Update skip for current viewed month if this toggle affects it
   if(mi===PM){
     const md=getPMD(who,PY,PM);
     if(ams[PM]===0) md.skips[id]=true;
     else delete md.skips[id];
     savePMD(who);
   }
-  renderPersSubs(who);
+  renderPersSubs(who); renderPersHist(who);
 }
 
 function addPersExp(){
