@@ -69,13 +69,6 @@ window._fbListen = (path, cb) => {
   );
 };
 
-// Run a test write to confirm Firebase is working
-async function testWrite() {
-  const ok = await window._fbSet('budget/meta', {_ping: Date.now()});
-  console.log('Firebase test write:', ok ? 'SUCCESS' : 'FAILED');
-}
-testWrite();
-
 window.dispatchEvent(new Event('fb-ready'));
 </script>
 <style>
@@ -228,9 +221,6 @@ td.rnum input{font-family:'DM Mono',monospace;text-align:right;}
 .cov-wrap{display:flex;align-items:center;gap:3px;flex-wrap:nowrap;}
 .cov-wrap input{width:42px!important;text-align:center!important;flex-shrink:0;}
 .cov-sep{font-size:.68rem;color:var(--slate);white-space:nowrap;flex-shrink:0;}
-.skip-btn{font-size:.62rem;font-weight:600;border-radius:5px;padding:3px 8px;border:1px solid;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;}
-.skip-on{background:#FEF0EB;color:var(--rust);border-color:var(--rust);}
-.skip-off{background:var(--lg);color:var(--slate);border-color:var(--border);}
 .ov-wrap{display:flex;align-items:center;gap:3px;}
 .ov-wrap input{font-family:'DM Mono',monospace;}
 .ov-reset{font-size:.7rem;color:var(--slate);cursor:pointer;background:none;border:none;padding:0 2px;opacity:.5;}
@@ -932,6 +922,7 @@ const CATS = ['Groceries / Household','Utilities & Bills','Dining Out','Kids / C
 const MO   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MOS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DEFAULT_PIN = '1234';
+const APP_VERSION = '1.0.0'; // 2026-04-03
 
 /* ════════════════════════════════════════════════
    STATE
@@ -1119,11 +1110,6 @@ async function loadAll(){
         document.getElementById('name1').value=name1;
         document.getElementById('name2').value=name2;
         localStorage.setItem('bgt_meta',JSON.stringify(meta));
-      }
-      // Load all month docs
-      if(window._db){
-        const { collection, getDocs } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
-        const snap=await getDocs(collection(window._db,'budget/months/months'.split('/')[0]));
       }
       // Load months via individual keys we know about
       const allMonthKeys=[...new Set([...Object.keys(DB), ...Array.from({length:24},(_,i)=>{
@@ -1821,12 +1807,14 @@ function getPMD(who,y,m){
   return PDB[who][k];
 }
 async function savePMD(who){
+  // NOTE: uses global PY/PM — only safe when called from the currently viewed personal month context
   const k=pmk(PY,PM);
   const data=PDB[who][k];
   try{ localStorage.setItem('bgt_p'+who+'_'+k, JSON.stringify(data)); }catch(e){}
   if(window._fbSet){ setSyncing(); const ok=await window._fbSet('personal_'+who+'/'+k,{data:JSON.stringify(data)}); ok?setSynced():setSyncError(); }
 }
-function pmk(y,m){ return `${y}-${String(m+1).padStart(2,'0')}`; }
+// pmk is an alias for mk (same key format for personal months)
+const pmk = mk;
 
 // ── Seed subscriptions into personal month ──
 function seedPersonalMonth(who,y,m){
@@ -2280,6 +2268,7 @@ document.getElementById('prevMonth').addEventListener('click',()=>changeMonth(-1
 document.getElementById('nextMonth').addEventListener('click',()=>changeMonth(1));
 
 (async function(){
+  console.log('Family Budget v' + APP_VERSION);
   // Show offline cache immediately while Firebase loads
   try{
     const m=JSON.parse(localStorage.getItem('bgt_meta')||'{}');

@@ -339,6 +339,13 @@ When working on this project, follow these rules:
 - Added `renderPersHist` calls to all personal sub modification functions
 - Bumped personal page `max-width` from 900px to 1100px to match main page
 - Removed all dead CSS for old personal-specific classes (psub-table, pexp-table, etc.)
+- **Tech debt cleanup:**
+  - Removed dead CSS: `.skip-btn`, `.skip-on`, `.skip-off` (unused since skip button removal)
+  - Removed broken `collection()`/`getDocs` query from `loadAll()` (was dead code, never worked)
+  - Removed Firebase `_ping` test write on every page load (unnecessary noise in Firestore)
+  - Consolidated duplicate `pmk()` function into alias for `mk()` (identical logic)
+  - Added `APP_VERSION` constant (`1.0.0`) — logged to console on startup for debugging
+  - Added safety comment on `savePMD()` documenting its global `PY`/`PM` dependency
 
 ### March 2026 (prior sessions, from memory)
 - Added dollar signs, ordinal suffixes, credits sections to personal pages
@@ -365,12 +372,13 @@ When working on this project, follow these rules:
 - [ ] Split expense support (e.g. 60/40 instead of just who-paid)
 
 ### Technical Debt
-- [ ] Clean up dead CSS (`.skip-btn`, `.skip-on`, `.skip-off` classes are unused now)
+- [x] ~~Clean up dead CSS (`.skip-btn`, `.skip-on`, `.skip-off` classes are unused now)~~ — removed
+- [x] ~~The `loadAll()` function tries to load a `collection()` query that doesn't work — dead code~~ — removed
+- [x] ~~Consider adding a version number to the HTML for cache-busting and debugging~~ — added `APP_VERSION`
+- [x] ~~Firebase test write on every load (`_ping`) is unnecessary noise~~ — removed
+- [x] ~~Duplicate `pmk()` function identical to `mk()`~~ — consolidated as alias
 - [ ] Consider moving `calcMonth` template-fallback logic into `seedMonth` so seeded data is always complete
-- [ ] Audit `savePMD` — it uses global `PY`/`PM` which could be a bug source if called from a non-current-month context
-- [ ] The `loadAll()` function tries to load a `collection()` query that doesn't work (line ~1120-1121) — dead code, should be removed
-- [ ] Consider adding a version number to the HTML for cache-busting and debugging
-- [ ] Firebase test write on every load (`_ping`) is unnecessary noise — consider removing or making conditional
+- [ ] Audit `savePMD` — it uses global `PY`/`PM` which could be a bug source if called from a non-current-month context (safety comment added)
 
 ### Nice to Have
 - [ ] Animations / transitions when switching months
