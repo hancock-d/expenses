@@ -204,7 +204,7 @@ main{max-width:1100px;margin:0 auto;padding:18px 14px calc(18px + var(--safe-bot
 .rsummary-row td{padding:6px 10px;border-bottom:none;}
 .rsummary-row:hover td{background:rgba(107,79,187,.03);}
 .rdetail-row{border-bottom:1px solid rgba(197,184,232,.35);}
-.rdetail-row.r-hidden{display:none;}
+.rdetail-row.r-hidden{display:none!important;}
 .rdetail-row.r-hidden+.rsummary-row,.rsummary-row:first-child{border-top:none;}
 .rsum{font-family:'DM Mono',monospace;font-size:.78rem;color:var(--slate);}
 .rexp-toggle{background:none;border:none;font-size:.6rem;color:var(--rv);cursor:pointer;padding:2px 4px;opacity:.5;vertical-align:middle;flex-shrink:0;}
@@ -285,7 +285,7 @@ td.anum input{font-family:'DM Mono',monospace;font-weight:500;text-align:left;}
 /* Collapsible expense/credit rows */
 .ec-summary-row td{padding:6px 10px;border-bottom:1px solid var(--lg);}
 .ec-summary-row:hover td{background:#FDFAF6;}
-.ec-detail-row.ec-hidden{display:none;}
+.ec-detail-row.ec-hidden{display:none!important;}
 .ec-toggle{background:none;border:none;font-size:.6rem;color:var(--slate);cursor:pointer;padding:2px 4px;opacity:.5;vertical-align:middle;flex-shrink:0;}
 .ec-toggle:hover{opacity:1;}
 .ec-note{font-size:.7rem;color:var(--slate);font-style:italic;margin-left:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px;display:inline-block;vertical-align:middle;}
@@ -1512,7 +1512,7 @@ function renderRecur(){
     sr.className='rsummary-row'+(rowClass?' '+rowClass:'');
     sr.innerHTML=`<td colspan="7" style="padding:8px 10px;"><div style="display:flex;align-items:center;gap:6px;">
       <button class="rexp-toggle" onclick="toggleRowCollapse('recur',${i},this)">${collapsed?'▶':'▼'}</button>
-      <span style="font-weight:500;font-size:.83rem;">${esc(t.name||'(unnamed)')}</span>
+      <input type="text" value="${esc(t.name||'')}" placeholder="e.g. Internet" onchange="updRecurImm(${i},'name',this.value)" style="font-weight:500;font-size:.83rem;border:1px solid transparent;border-radius:5px;padding:2px 6px;background:transparent;font-family:'DM Sans',sans-serif;color:var(--ink);min-width:100px;flex:1;" onfocus="this.style.borderColor='var(--rv)';this.style.background='white'" onblur="this.style.borderColor='transparent';this.style.background='transparent'">
       <span class="rsum">${fmt(moTotal)}${freq!=='monthly'?' ('+occ+'×)':''}</span>
       ${t.notes?'<span class="ec-note" style="color:var(--rv);">'+esc(t.notes)+'</span>':''}
     </div></td>`;
@@ -1522,9 +1522,7 @@ function renderRecur(){
     const dr=document.createElement('tr');
     dr.className='rdetail-row'+(collapsed?' r-hidden':'')+(rowClass?' '+rowClass:'');
     dr.innerHTML=`
-      <td colspan="2" style="min-width:160px"><input type="text" value="${esc(t.name||'')}" placeholder="e.g. Internet"
-            onchange="updRecurImm(${i},'name',this.value)" style="min-width:140px"></td>
-      <td>
+      <td colspan="2">
         <div style="display:flex;flex-direction:column;gap:3px;">
           <div>
             <span style="font-size:.55rem;font-weight:700;color:var(--rv);text-transform:uppercase;letter-spacing:.06em;">Paid By</span>
@@ -2252,7 +2250,7 @@ function renderPersSubs(who){
     sr.className='rsummary-row'+(rowClass?' '+rowClass:'');
     sr.innerHTML=`<td colspan="6" style="padding:8px 10px;"><div style="display:flex;align-items:center;gap:6px;">
       <button class="rexp-toggle" onclick="toggleRowCollapse('precur',${i},this)">${collapsed?'▶':'▼'}</button>
-      <span style="font-weight:500;font-size:.83rem;">${esc(t.name||'(unnamed)')}</span>
+      <input type="text" value="${esc(t.name||'')}" placeholder="e.g. Netflix" onchange="updPSub('${who}',${i},'name',this.value)" style="font-weight:500;font-size:.83rem;border:1px solid transparent;border-radius:5px;padding:2px 6px;background:transparent;font-family:'DM Sans',sans-serif;color:var(--ink);min-width:100px;flex:1;" onfocus="this.style.borderColor='var(--rv)';this.style.background='white'" onblur="this.style.borderColor='transparent';this.style.background='transparent'">
       <span class="rsum">${fmt(pMoTotal)}${pFreq!=='monthly'?' (≈/mo)':''}</span>
       ${t.notes?'<span class="ec-note" style="color:var(--rv);">'+esc(t.notes)+'</span>':''}
     </div></td>`;
@@ -2262,8 +2260,7 @@ function renderPersSubs(who){
     const tr=document.createElement('tr');
     tr.className='rdetail-row'+(collapsed?' r-hidden':'')+(rowClass?' '+rowClass:'');
     tr.innerHTML=`
-      <td colspan="2" style="min-width:160px"><input type="text" value="${esc(t.name||'')}" placeholder="e.g. Netflix" onchange="updPSub('${who}',${i},'name',this.value)" style="min-width:140px"></td>
-      <td class="rnum">
+      <td colspan="2" class="rnum">
         <div style="display:flex;flex-direction:column;gap:3px;">
           <div>
             <span style="font-size:.55rem;font-weight:700;color:var(--rv);text-transform:uppercase;letter-spacing:.06em;">Usual Cost</span>
