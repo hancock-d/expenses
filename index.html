@@ -335,54 +335,41 @@ td.anum input{font-family:'DM Mono',monospace;font-weight:500;text-align:left;}
 
   /* Expense table mobile — each field own row */
   .etable thead{display:none;}
-  .etable tbody tr{
+  .etable tbody tr.ec-summary-row{display:block;padding:8px 12px;border-bottom:1px solid var(--border);}
+  .etable tbody tr.ec-summary-row td{display:block;padding:0;border:none;}
+  .etable tbody tr.ec-detail-row{
     display:grid;
     grid-template-columns:1fr 24px;
     gap:5px 6px;padding:10px 12px;
     border-bottom:2px solid var(--border)!important;
   }
   .etable tbody td{padding:2px 0;border:none;min-width:0;}
-  /* Row 1: date | delete */
-  .etable tbody td:nth-child(1){grid-row:1;grid-column:1;font-size:.8rem;}
-  .etable tbody td:nth-child(8){grid-row:1;grid-column:2;align-self:center;text-align:right;}
-  /* Row 2: description full width */
-  .etable tbody td:nth-child(2){grid-row:2;grid-column:1/-1;}
-  /* Row 3: category full width */
-  .etable tbody td:nth-child(3){grid-row:3;grid-column:1/-1;}
-  /* Row 4: paid by full width */
-  .etable tbody td:nth-child(4){grid-row:4;grid-column:1/-1;}
-  /* Row 5: payment full width */
-  .etable tbody td:nth-child(5){grid-row:5;grid-column:1/-1;}
-  /* Row 6: amount full width */
-  .etable tbody td:nth-child(6){grid-row:6;grid-column:1/-1;}
-  /* Row 7: notes full width */
-  .etable tbody td:nth-child(7){grid-row:7;grid-column:1/-1;}
+  /* Detail row grid placement */
+  .etable tbody tr.ec-detail-row td:nth-child(1){grid-row:1;grid-column:1;font-size:.8rem;}
+  .etable tbody tr.ec-detail-row td:nth-child(8){grid-row:1;grid-column:2;align-self:center;text-align:right;}
+  .etable tbody tr.ec-detail-row td:nth-child(2){grid-row:2;grid-column:1/-1;}
+  .etable tbody tr.ec-detail-row td:nth-child(3){grid-row:3;grid-column:1/-1;}
+  .etable tbody tr.ec-detail-row td:nth-child(4){grid-row:4;grid-column:1/-1;}
+  .etable tbody tr.ec-detail-row td:nth-child(5){grid-row:5;grid-column:1/-1;}
+  .etable tbody tr.ec-detail-row td:nth-child(6){grid-row:6;grid-column:1/-1;}
+  .etable tbody tr.ec-detail-row td:nth-child(7){grid-row:7;grid-column:1/-1;}
   .etable td input,.etable td select{font-size:.85rem;}
 
-  /* Recurring mobile — compact card layout
-     td order: 1=check 2=name 3=paidby+cat(stacked) 4=cost 5=details 6=days-covered 7=notes+delete */
+  /* Recurring mobile — compact card layout */
   .rtable{min-width:0;}
   .rtable thead{display:none;}
-  .rtable tbody tr{
+  /* Summary rows — simple block layout */
+  .rtable tbody tr.rsummary-row{display:block;padding:8px 12px;border-bottom:1px solid var(--rb);}
+  .rtable tbody tr.rsummary-row td{display:block;padding:0;border:none;}
+  /* Detail rows — stacked grid
+     td order: 1=name(colspan2) 2=paidby+cat 3=cost 4=details 5=days-covered 6=notes+delete */
+  .rtable tbody tr.rdetail-row{
     display:grid;
-    grid-template-columns:24px 1fr;
-    gap:5px 8px;padding:10px 12px;
+    grid-template-columns:1fr;
+    gap:5px 0;padding:10px 12px;
     border-bottom:2px solid var(--rb)!important;
   }
   .rtable tbody td{padding:2px 0;border:none;min-width:0;}
-  /* Row 1: check | name */
-  .rtable tbody td:nth-child(1){grid-row:1;grid-column:1;align-self:center;}
-  .rtable tbody td:nth-child(2){grid-row:1;grid-column:2;}
-  /* Row 2: paid-by + category (stacked) */
-  .rtable tbody td:nth-child(3){grid-row:2;grid-column:2;}
-  /* Row 3: cost */
-  .rtable tbody td:nth-child(4){grid-row:3;grid-column:2;}
-  /* Row 4: details */
-  .rtable tbody td:nth-child(5){grid-row:4;grid-column:2;}
-  /* Row 5: days covered */
-  .rtable tbody td:nth-child(6){grid-row:5;grid-column:2;}
-  /* Row 6: notes + delete */
-  .rtable tbody td:nth-child(7){grid-row:6;grid-column:2;}
   /* Coverage dropdowns inline */
   .rtable .cov-wrap{display:flex;flex-wrap:nowrap;align-items:center;gap:4px;}
   .rtable .cov-wrap select{flex-shrink:0;}
@@ -391,26 +378,23 @@ td.anum input{font-family:'DM Mono',monospace;font-weight:500;text-align:left;}
 
   /* Credits mobile — each field own row */
   .ctable thead{display:none;}
-  .ctable tbody tr{
+  .ctable tbody tr.ec-summary-row{display:block;padding:8px 12px;border-bottom:1px solid var(--cb);}
+  .ctable tbody tr.ec-summary-row td{display:block;padding:0;border:none;}
+  .ctable tbody tr.ec-detail-row{
     display:grid;
     grid-template-columns:1fr 24px;
     gap:5px 6px;padding:10px 12px;
     border-bottom:2px solid var(--cb)!important;
   }
   .ctable tbody td{padding:2px 0;border:none;min-width:0;}
-  /* Row 1: date | delete */
-  .ctable tbody td:nth-child(1){grid-row:1;grid-column:1;}
-  .ctable tbody td:nth-child(7){grid-row:1;grid-column:2;align-self:center;text-align:right;}
-  /* Row 2: description full width */
-  .ctable tbody td:nth-child(2){grid-row:2;grid-column:1/-1;}
-  /* Row 3: credited to full width */
-  .ctable tbody td:nth-child(3){grid-row:3;grid-column:1/-1;}
-  /* Row 4: payment full width */
-  .ctable tbody td:nth-child(4){grid-row:4;grid-column:1/-1;}
-  /* Row 5: amount full width */
-  .ctable tbody td:nth-child(5){grid-row:5;grid-column:1/-1;}
-  /* Row 6: notes full width */
-  .ctable tbody td:nth-child(6){grid-row:6;grid-column:1/-1;}
+  /* Detail row grid placement */
+  .ctable tbody tr.ec-detail-row td:nth-child(1){grid-row:1;grid-column:1;}
+  .ctable tbody tr.ec-detail-row td:nth-child(7){grid-row:1;grid-column:2;align-self:center;text-align:right;}
+  .ctable tbody tr.ec-detail-row td:nth-child(2){grid-row:2;grid-column:1/-1;}
+  .ctable tbody tr.ec-detail-row td:nth-child(3){grid-row:3;grid-column:1/-1;}
+  .ctable tbody tr.ec-detail-row td:nth-child(4){grid-row:4;grid-column:1/-1;}
+  .ctable tbody tr.ec-detail-row td:nth-child(5){grid-row:5;grid-column:1/-1;}
+  .ctable tbody tr.ec-detail-row td:nth-child(6){grid-row:6;grid-column:1/-1;}
 
   /* History mobile — scrollable */
   .hist-section{overflow-x:auto;}
@@ -420,33 +404,28 @@ td.anum input{font-family:'DM Mono',monospace;font-weight:500;text-align:left;}
   .names-row{gap:8px;}
 
   /* ── Personal page mobile overrides ──
-     Personal rtable has 6 tds: 1=check 2=name 3=cost 4=details 5=days-covered 6=notes+delete
+     Personal rtable detail has 5 tds: 1=name(colspan2) 2=cost 3=details 4=days-covered 5=notes+delete
      Personal etable has 7 tds: 1=date 2=desc 3=cat 4=payment 5=amount 6=notes 7=delete */
-  #pers-overlay .rtable tbody tr{
-    grid-template-columns:24px 1fr;
+  #pers-overlay .rtable tbody tr.rsummary-row{display:block;padding:8px 12px;border-bottom:1px solid var(--rb);}
+  #pers-overlay .rtable tbody tr.rsummary-row td{display:block;padding:0;border:none;}
+  #pers-overlay .rtable tbody tr.rdetail-row{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:5px 0;padding:10px 12px;
   }
-  /* Row 1: check | name */
-  #pers-overlay .rtable tbody td:nth-child(1){grid-row:1;grid-column:1;align-self:center;}
-  #pers-overlay .rtable tbody td:nth-child(2){grid-row:1;grid-column:2;}
-  /* Row 2: cost */
-  #pers-overlay .rtable tbody td:nth-child(3){grid-row:2;grid-column:2;}
-  /* Row 3: details */
-  #pers-overlay .rtable tbody td:nth-child(4){grid-row:3;grid-column:2;}
-  /* Row 4: days covered */
-  #pers-overlay .rtable tbody td:nth-child(5){grid-row:4;grid-column:2;}
-  /* Row 5: notes + delete */
-  #pers-overlay .rtable tbody td:nth-child(6){grid-row:5;grid-column:2;}
 
-  #pers-overlay .etable tbody tr{
+  #pers-overlay .etable tbody tr.ec-summary-row{display:block;padding:8px 12px;border-bottom:1px solid var(--border);}
+  #pers-overlay .etable tbody tr.ec-summary-row td{display:block;padding:0;border:none;}
+  #pers-overlay .etable tbody tr.ec-detail-row{
     grid-template-columns:1fr 24px;
   }
-  #pers-overlay .etable tbody td:nth-child(1){grid-row:1;grid-column:1;}
-  #pers-overlay .etable tbody td:nth-child(7){grid-row:1;grid-column:2;align-self:center;text-align:right;}
-  #pers-overlay .etable tbody td:nth-child(2){grid-row:2;grid-column:1/-1;}
-  #pers-overlay .etable tbody td:nth-child(3){grid-row:3;grid-column:1/-1;}
-  #pers-overlay .etable tbody td:nth-child(4){grid-row:4;grid-column:1/-1;}
-  #pers-overlay .etable tbody td:nth-child(5){grid-row:5;grid-column:1/-1;}
-  #pers-overlay .etable tbody td:nth-child(6){grid-row:6;grid-column:1/-1;}
+  #pers-overlay .etable tbody tr.ec-detail-row td:nth-child(1){grid-row:1;grid-column:1;}
+  #pers-overlay .etable tbody tr.ec-detail-row td:nth-child(7){grid-row:1;grid-column:2;align-self:center;text-align:right;}
+  #pers-overlay .etable tbody tr.ec-detail-row td:nth-child(2){grid-row:2;grid-column:1/-1;}
+  #pers-overlay .etable tbody tr.ec-detail-row td:nth-child(3){grid-row:3;grid-column:1/-1;}
+  #pers-overlay .etable tbody tr.ec-detail-row td:nth-child(4){grid-row:4;grid-column:1/-1;}
+  #pers-overlay .etable tbody tr.ec-detail-row td:nth-child(5){grid-row:5;grid-column:1/-1;}
+  #pers-overlay .etable tbody tr.ec-detail-row td:nth-child(6){grid-row:6;grid-column:1/-1;}
 }
 
 
