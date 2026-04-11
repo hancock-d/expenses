@@ -1241,19 +1241,15 @@ function seedMonth(y,m){
     const freq=t.frequency||'monthly';
 
     if(freq==='monthly'||freq==='annual'||freq==='semiannual'){
-      // For annual/semiannual, check if this month is an active occurrence
+      // For annual/semiannual, auto-skip in off-months (charge still shows, dimmed, excluded from totals)
       if(freq==='annual'||freq==='semiannual'){
         const anchor=t.anchorDate;
         if(anchor){
           const anchorD=new Date(anchor+'T12:00:00');
           const anchorMo=anchorD.getMonth();
           const isActive=freq==='annual'?(m===anchorMo):(m===anchorMo||m===(anchorMo+6)%12);
-          if(!isActive){
-            // Remove any leftover expense if frequency changed to/from this month
-            const stale=md.expenses.findIndex(e=>e.recurId===t.id);
-            if(stale!==-1){ md.expenses.splice(stale,1); changed=true; }
-            continue;
-          }
+          if(!isActive && !md.skips[t.id]){ md.skips[t.id]=true; changed=true; }
+          if(isActive && md.skips[t.id]){ delete md.skips[t.id]; changed=true; }
         }
       }
       // Clean up any leftover multi-occurrence expenses from a previous weekly/biweekly setting
@@ -1961,6 +1957,25 @@ function updRecurImm(i,f,v){
   RECUR[i][f]=v; saveMeta();
   // If frequency or anchorDate changed, re-seed the month
   if(f==='frequency'||f==='anchorDate'){
+    // Auto-set activeMonths for annual/semiannual based on anchor date
+    const t=RECUR[i];
+    const fr=t.frequency||'monthly';
+    if((fr==='annual'||fr==='semiannual')&&t.anchorDate){
+      const anchorMo=new Date(t.anchorDate+'T12:00:00').getMonth();
+      if(!isNaN(anchorMo)){
+        const ams=[0,0,0,0,0,0,0,0,0,0,0,0];
+        ams[anchorMo]=1;
+        if(fr==='semiannual') ams[(anchorMo+6)%12]=1;
+        RECUR[i].activeMonths=ams;
+        saveMeta();
+      }
+    } else if(fr==='monthly'||fr==='weekly'||fr==='biweekly'){
+      // Reset to all months active when switching back
+      if(RECUR[i].activeMonths&&RECUR[i].activeMonths.filter(v=>v).length<=2){
+        RECUR[i].activeMonths=[1,1,1,1,1,1,1,1,1,1,1,1];
+        saveMeta();
+      }
+    }
     const md=getMD(Y,M);
     md.seeded=false;
     seedMonth(Y,M);
