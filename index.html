@@ -1524,7 +1524,7 @@ function renderRecur(){
     sr.className='rsummary-row'+(rowClass?' '+rowClass:'');
     sr.innerHTML=`<td colspan="7" style="padding:8px 10px;"><div style="display:flex;align-items:center;gap:6px;">
       <button class="rexp-toggle" onclick="toggleRowCollapse('recur',${i},this)">${collapsed?'▶':'▼'}</button>
-      <input type="text" value="${esc(t.name||'')}" placeholder="e.g. Internet" onchange="updRecurImm(${i},'name',this.value)" style="font-weight:500;font-size:.82rem;border:1px solid transparent;border-radius:5px;padding:2px 6px;background:transparent;font-family:'DM Sans',sans-serif;color:var(--ink);min-width:100px;flex:1;" onfocus="this.style.borderColor='var(--rv)';this.style.background='white'" onblur="this.style.borderColor='transparent';this.style.background='transparent'">
+      <span contenteditable="true" style="font-weight:500;font-size:.82rem;padding:2px 6px;font-family:'DM Sans',sans-serif;color:var(--ink);min-width:60px;flex:1;outline:none;border:1px solid transparent;border-radius:5px;" onfocus="this.style.borderColor='var(--rv)';this.style.background='white'" onblur="this.style.borderColor='transparent';this.style.background='transparent';updRecurImm(${i},'name',this.textContent.trim())">${esc(t.name||'')}</span>
       <span class="rsum">${fmt(moTotal)}${freq==='weekly'||freq==='biweekly'?' ('+occ+'×)':freq==='annual'?' (annual)':freq==='semiannual'?' (every 6 mo)':''}</span>
       ${t.notes?'<span class="ec-note" style="color:var(--rv);">'+esc(t.notes)+'</span>':''}
     </div></td>`;
@@ -2283,7 +2283,7 @@ function renderPersSubs(who){
     sr.className='rsummary-row'+(rowClass?' '+rowClass:'');
     sr.innerHTML=`<td colspan="6" style="padding:8px 10px;"><div style="display:flex;align-items:center;gap:6px;">
       <button class="rexp-toggle" onclick="toggleRowCollapse('precur',${i},this)">${collapsed?'▶':'▼'}</button>
-      <input type="text" value="${esc(t.name||'')}" placeholder="e.g. Netflix" onchange="updPSub('${who}',${i},'name',this.value)" style="font-weight:500;font-size:.82rem;border:1px solid transparent;border-radius:5px;padding:2px 6px;background:transparent;font-family:'DM Sans',sans-serif;color:var(--ink);min-width:100px;flex:1;" onfocus="this.style.borderColor='var(--rv)';this.style.background='white'" onblur="this.style.borderColor='transparent';this.style.background='transparent'">
+      <span contenteditable="true" style="font-weight:500;font-size:.82rem;padding:2px 6px;font-family:'DM Sans',sans-serif;color:var(--ink);min-width:60px;flex:1;outline:none;border:1px solid transparent;border-radius:5px;" onfocus="this.style.borderColor='var(--rv)';this.style.background='white'" onblur="this.style.borderColor='transparent';this.style.background='transparent';updPSub('${who}',${i},'name',this.textContent.trim())">${esc(t.name||'')}</span>
       <span class="rsum">${fmt(pMoTotal)}${pFreq==='weekly'||pFreq==='biweekly'?' (≈/mo)':pFreq==='annual'?' (annual)':pFreq==='semiannual'?' (every 6 mo)':''}</span>
       ${t.notes?'<span class="ec-note" style="color:var(--rv);">'+esc(t.notes)+'</span>':''}
     </div></td>`;
