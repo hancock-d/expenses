@@ -695,7 +695,7 @@ input[placeholder="Optional note…"]:focus {
               <th style="width:170px">Category</th>
               <th style="width:120px">Cost</th>
               <th style="width:130px">Payment</th>
-              <th style="width:320px">Coverage <span style="opacity:.5;font-weight:400;font-style:italic;font-size:.55rem">relative to viewed month</span></th>
+              <th style="width:320px">Days Covered <span style="opacity:.5;font-weight:400;font-style:italic;font-size:.55rem">relative to viewed month</span></th>
               <th style="min-width:130px">Notes</th>
             </tr></thead>
             <tbody id="r-tbody"></tbody>
@@ -784,7 +784,7 @@ input[placeholder="Optional note…"]:focus {
         <thead><tr>
           <th>Month</th>
           <th id="h1">Dave</th>
-          <th id="h2">Wife</th>
+          <th id="h2">Lindsey</th>
           <th>Balance</th>
           <th>Carryover</th>
           <th>Status</th>
@@ -876,7 +876,7 @@ input[placeholder="Optional note…"]:focus {
                 <th style="min-width:180px">Name</th>
                 <th style="width:130px">Cost</th>
                 <th style="width:130px">Payment</th>
-                <th style="width:320px">Coverage <span style="opacity:.5;font-weight:400;font-style:italic;font-size:.55rem">relative to viewed month</span></th>
+                <th style="width:320px">Days Covered <span style="opacity:.5;font-weight:400;font-style:italic;font-size:.55rem">relative to viewed month</span></th>
                 <th style="min-width:130px">Notes</th>
               </tr></thead>
               <tbody id="ps-sub-tbody"></tbody>
@@ -980,7 +980,7 @@ const CATS = ['Groceries / Household','Utilities & Bills','Dining Out','Kids / C
 const MO   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MOS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DEFAULT_PIN = '1234';
-const APP_VERSION = '1.1.0'; // 2026-04-05 — import/export, collapsible Other Expenses
+const APP_VERSION = '1.2.0'; // 2026-04-05 — sparklines, biweekly/weekly, import/export
 
 /* ════════════════════════════════════════════════
    STATE
@@ -1237,33 +1237,102 @@ function seedMonth(y,m){
   let changed=false;
   for(const t of RECUR){
     if(!t.active) continue;
-    const existing=md.expenses.find(e=>e.recurId===t.id);
-    if(!existing){
-      // Seed new entry
-      md.expenses.push({
-        date:chargeDate(t.chargeDay,y,m),
-        desc:t.name+covStr(t,y,m),
-        cat:t.cat||'Utilities & Bills',
-        paidBy:t.paidBy||'1',
-        amount:t.amount||'',
-        recurId:t.id
-      });
-      // Auto-skip if this month is inactive
-      const ams=t.activeMonths;
-      if(ams && ams[m]===0) md.skips[t.id]=true;
-      changed=true;
-    } else {
-      // Sync stale data — if seeded amount is empty but template has one, update it
-      if((!existing.amount || existing.amount==='') && t.amount){
-        existing.amount=t.amount; changed=true;
+    const freq=t.frequency||'monthly';
+
+    if(freq==='monthly'){
+      // Original behavior — one expense per month
+      const existing=md.expenses.find(e=>e.recurId===t.id);
+      if(!existing){
+        md.expenses.push({
+          date:chargeDate(t.chargeDay,y,m),
+          desc:t.name+covStr(t,y,m),
+          cat:t.cat||'Utilities & Bills',
+          paidBy:t.paidBy||'1',
+          amount:t.amount||'',
+          recurId:t.id
+        });
+        const ams=t.activeMonths;
+        if(ams && ams[m]===0) md.skips[t.id]=true;
+        changed=true;
+      } else {
+        if((!existing.amount || existing.amount==='') && t.amount){
+          existing.amount=t.amount; changed=true;
+        }
+        if(existing.paidBy!==t.paidBy && t.paidBy){
+          existing.paidBy=t.paidBy; changed=true;
+        }
       }
-      if(existing.paidBy!==t.paidBy && t.paidBy){
-        existing.paidBy=t.paidBy; changed=true;
+    } else {
+      // Weekly or biweekly — compute occurrence dates in this month
+      const dates=getRecurDates(t,y,m);
+      dates.forEach((dt,idx)=>{
+        const rid=t.id+'_'+idx;
+        const existing=md.expenses.find(e=>e.recurId===rid);
+        if(!existing){
+          md.expenses.push({
+            date:dt,
+            desc:t.name+' ('+ordinal(idx+1)+')',
+            cat:t.cat||'Utilities & Bills',
+            paidBy:t.paidBy||'1',
+            amount:t.amount||'',
+            recurId:rid,
+            recurParent:t.id
+          });
+          const ams=t.activeMonths;
+          if(ams && ams[m]===0) md.skips[t.id]=true;
+          changed=true;
+        } else {
+          if((!existing.amount || existing.amount==='') && t.amount){
+            existing.amount=t.amount; changed=true;
+          }
+          if(existing.paidBy!==t.paidBy && t.paidBy){
+            existing.paidBy=t.paidBy; changed=true;
+          }
+        }
+      });
+      // Clean up stale occurrences if anchor date changed (more seeded than expected)
+      const validRids=new Set(dates.map((_,idx)=>t.id+'_'+idx));
+      const stale=md.expenses.filter(e=>e.recurParent===t.id && !validRids.has(e.recurId));
+      if(stale.length){
+        md.expenses=md.expenses.filter(e=>!(e.recurParent===t.id && !validRids.has(e.recurId)));
+        changed=true;
       }
     }
   }
   md.seeded=true;
   if(changed) saveMD();
+}
+
+// Compute occurrence dates for biweekly/weekly charges in a given month
+function getRecurDates(t,y,m){
+  const freq=t.frequency||'monthly';
+  const anchor=t.anchorDate;
+  if(!anchor) return [];
+  const anchorD=new Date(anchor+'T12:00:00'); // noon to avoid TZ issues
+  if(isNaN(anchorD)) return [];
+  const interval=freq==='weekly'?7:14;
+  const monthStart=new Date(y,m,1);
+  const monthEnd=new Date(y,m+1,0); // last day of month
+  const dates=[];
+  // Find the first occurrence on or after the anchor that falls in or before this month
+  // Step forward/backward from anchor by intervals to find first occurrence in this month
+  const anchorMs=anchorD.getTime();
+  const startMs=monthStart.getTime();
+  const endMs=monthEnd.getTime();
+  const intervalMs=interval*86400000;
+  // How many intervals from anchor to month start?
+  let diff=startMs-anchorMs;
+  let steps=Math.floor(diff/intervalMs);
+  // Start checking from a couple steps before to be safe
+  for(let s=Math.max(0,steps-1);s<=steps+6;s++){
+    const d=new Date(anchorMs+s*intervalMs);
+    if(d>=monthStart && d<=monthEnd){
+      const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      dates.push(ds);
+    }
+    if(d>monthEnd) break;
+  }
+  return dates;
 }
 function chargeDate(day,y,m){
   const d=Math.min(parseInt(day)||1,new Date(y,m+1,0).getDate());
@@ -1301,13 +1370,13 @@ function calcMonth(y,m){
   let paid1=0, paid2=0;
 
   for(const e of md.expenses){
-    if(e.recurId&&md.skips[e.recurId]) continue;
+    if(e.recurId&&(md.skips[e.recurId]||md.skips[e.recurParent])) continue;
     let a=parseFloat(e.amount)||0;
     // For recurring charges with no amount, fall back to override then template
     if(!a && e.recurId){
       const ov=md.overrides&&md.overrides[e.recurId];
       if(ov!==undefined && ov!=='') a=parseFloat(ov)||0;
-      if(!a){ const t=RECUR.find(r=>r.id===e.recurId); if(t) a=parseFloat(t.amount)||0; }
+      if(!a){ const t=RECUR.find(r=>r.id===e.recurId||r.id===e.recurParent); if(t) a=parseFloat(t.amount)||0; }
     }
     if(!a) continue;
     if(e.paidBy==='1') paid1+=a;
@@ -1407,9 +1476,18 @@ function renderRecur(){
   let cnt=0,tot=0;
   RECUR.forEach((t,i)=>{
     const sk=!!(md.skips&&md.skips[t.id]);
+    const freq=t.frequency||'monthly';
     const ov=md.overrides&&md.overrides[t.id]!==undefined?md.overrides[t.id]:'';
     const disp=ov!==''?ov:t.amount;
-    if(t.active&&!sk){cnt++;tot+=parseFloat(disp)||0;}
+    if(t.active&&!sk){
+      cnt++;
+      if(freq==='monthly'){
+        tot+=parseFloat(disp)||0;
+      } else {
+        const occ=getRecurDates(t,Y,M).length;
+        tot+=(parseFloat(disp)||0)*occ;
+      }
+    }
     const tr=document.createElement('tr');
     if(!t.active) tr.className='ri';
     else if(sk) tr.className='rskip';
@@ -1447,6 +1525,14 @@ function renderRecur(){
       <td>
         <div style="display:flex;flex-direction:column;gap:3px;">
           <div>
+            <span style="font-size:.55rem;font-weight:700;color:var(--rv);text-transform:uppercase;letter-spacing:.06em;">Frequency</span>
+            <select onchange="updRecurImm(${i},'frequency',this.value)">
+              <option value="monthly" ${(t.frequency||'monthly')==='monthly'?'selected':''}>Monthly</option>
+              <option value="biweekly" ${t.frequency==='biweekly'?'selected':''}>Bi-weekly</option>
+              <option value="weekly" ${t.frequency==='weekly'?'selected':''}>Weekly</option>
+            </select>
+          </div>
+          <div>
             <span style="font-size:.55rem;font-weight:700;color:var(--rv);text-transform:uppercase;letter-spacing:.06em;">Payment Type</span>
             <select onchange="updRecurImm(${i},'payment',this.value)">
               <option value="" ${!t.payment?'selected':''}>—</option>
@@ -1459,12 +1545,16 @@ function renderRecur(){
               <option value="Other" ${t.payment==='Other'?'selected':''}>Other</option>
             </select>
           </div>
-          <div>
+          ${(t.frequency||'monthly')==='monthly'?`<div>
             <span style="font-size:.55rem;font-weight:700;color:var(--rv);text-transform:uppercase;letter-spacing:.06em;">Charge Day</span>
             <select onchange="updRecurImm(${i},'chargeDay',this.value)" style="width:100%">
               ${chargeDayOptions(t.chargeDay)}
             </select>
-          </div>
+          </div>`:`<div>
+            <span style="font-size:.55rem;font-weight:700;color:var(--rv);text-transform:uppercase;letter-spacing:.06em;">Anchor Date</span>
+            <input type="date" value="${t.anchorDate||''}" onchange="updRecurImm(${i},'anchorDate',this.value)" title="First occurrence — all future dates calculated from this">
+            ${getRecurDates(t,Y,M).length?'<div style="font-size:.6rem;color:var(--slate);margin-top:2px;">'+getRecurDates(t,Y,M).length+'× this month</div>':''}
+          </div>`}
         </div>
       </td>
       <td>
@@ -1607,16 +1697,63 @@ function renderExpenses(){
 
 function renderCats(){
   const md=getMD(Y,M);
+  // Current month totals
   const tots={}; CATS.forEach(c=>tots[c]=0);
   for(const e of md.expenses){
-    if(e.recurId&&md.skips[e.recurId]) continue;
-    const a=parseFloat(e.amount)||0;
+    if(e.recurId&&(md.skips[e.recurId]||md.skips[e.recurParent])) continue;
+    let a=parseFloat(e.amount)||0;
+    if(!a && e.recurId){
+      const ov=md.overrides&&md.overrides[e.recurId];
+      if(ov!==undefined && ov!=='') a=parseFloat(ov)||0;
+      if(!a){ const t=RECUR.find(r=>r.id===e.recurId||r.id===e.recurParent); if(t) a=parseFloat(t.amount)||0; }
+    }
     tots[CATS.includes(e.cat)?e.cat:'Other']+=a;
   }
+
+  // Build 4-month history per category (current + 3 prior) for sparklines
+  const sparkMonths=[];
+  for(let i=3;i>=0;i--){
+    let sm=M-i, sy=Y;
+    while(sm<0){sm+=12;sy--;}
+    sparkMonths.push({y:sy,m:sm,k:mk(sy,sm)});
+  }
+  const sparkData={};
+  CATS.forEach(c=>sparkData[c]=[]);
+  sparkMonths.forEach(({y,m,k})=>{
+    const smd=DB[k];
+    const catTots={}; CATS.forEach(c=>catTots[c]=0);
+    if(smd){
+      for(const e of (smd.expenses||[])){
+        if(e.recurId&&smd.skips&&smd.skips[e.recurId]) continue;
+        let a=parseFloat(e.amount)||0;
+        if(!a && e.recurId){
+          const ov=smd.overrides&&smd.overrides[e.recurId];
+          if(ov!==undefined && ov!=='') a=parseFloat(ov)||0;
+          if(!a){ const t=RECUR.find(r=>r.id===e.recurId||r.id===e.recurParent); if(t) a=parseFloat(t.amount)||0; }
+        }
+        catTots[CATS.includes(e.cat)?e.cat:'Other']+=a;
+      }
+    }
+    CATS.forEach(c=>sparkData[c].push(catTots[c]));
+  });
+
+  function miniSpark(vals){
+    const max=Math.max(...vals,1);
+    const w=60, h=20, pad=2;
+    const step=(w-pad*2)/(vals.length-1);
+    const pts=vals.map((v,i)=>`${pad+i*step},${h-pad-(v/max)*(h-pad*2)}`);
+    if(vals.every(v=>v===0)) return `<svg width="${w}" height="${h}" style="opacity:.25"><line x1="${pad}" y1="${h-pad}" x2="${w-pad}" y2="${h-pad}" stroke="var(--border)" stroke-width="1"/></svg>`;
+    return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline points="${pts.join(' ')}" fill="none" stroke="var(--rv)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${pts[pts.length-1].split(',')[0]}" cy="${pts[pts.length-1].split(',')[1]}" r="2" fill="var(--rv)"/></svg>`;
+  }
+
+  const sparkLabels=sparkMonths.map(s=>MOS[s.m]).join(' → ');
   document.getElementById('cat-grid').innerHTML=CATS.map(c=>`
     <div class="cat-tile">
       <div class="cat-name">${c}</div>
-      <div class="cat-amt">${fmt(tots[c])}</div>
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:6px;">
+        <div class="cat-amt">${fmt(tots[c])}</div>
+        <div title="${sparkLabels}">${miniSpark(sparkData[c])}</div>
+      </div>
     </div>`).join('');
 }
 
@@ -1716,6 +1853,7 @@ function hdrAddPersCredit(){
 ════════════════════════════════════════════════ */
 function addRecur(){
   const t={id:'r'+Date.now(),name:'',paidBy:'1',amount:'',chargeDay:'',
+    frequency:'monthly',anchorDate:'',
     covStartRef:'curr',covStartDay:'',covEndRef:'next',covEndDay:'',
     activeMonths:[1,1,1,1,1,1,1,1,1,1,1,1],active:true};
   RECUR.push(t);
@@ -1730,16 +1868,32 @@ function addRecur(){
 // updRecurImm: re-renders table (safe for selects/checkbox where focus doesn't matter)
 function updRecurImm(i,f,v){
   RECUR[i][f]=v; saveMeta();
-  // Sync seeded expense in current month for fields that affect totals
+  // If frequency or anchorDate changed, re-seed the month
+  if(f==='frequency'||f==='anchorDate'){
+    const md=getMD(Y,M);
+    md.seeded=false;
+    seedMonth(Y,M);
+    render();
+    return;
+  }
+  // Sync seeded expense(s) in current month for fields that affect totals
   if(f==='amount'||f==='paidBy'||f==='name'){
     const md=getMD(Y,M);
     const tid=RECUR[i].id;
     for(const e of md.expenses){
-      if(e.recurId===tid){
+      // Match both direct recurId and recurParent (for weekly/biweekly)
+      if(e.recurId===tid || e.recurParent===tid){
         if(f==='amount') e.amount=v;
         if(f==='paidBy') e.paidBy=v;
-        if(f==='name')   e.desc=v+covStr(RECUR[i],Y,M);
-        break;
+        if(f==='name'){
+          if(e.recurParent===tid){
+            // Multi-occurrence: keep the ordinal suffix
+            const idx=parseInt((e.recurId||'').split('_').pop())||0;
+            e.desc=v+' ('+ordinal(idx+1)+')';
+          } else {
+            e.desc=v+covStr(RECUR[i],Y,M);
+          }
+        }
       }
     }
     saveMD();
@@ -1752,10 +1906,10 @@ function delRecur(i){
   const tid = RECUR[i].id;
   RECUR.splice(i,1);
   saveMeta();
-  // Remove the seeded expense from the current month
+  // Remove seeded expenses — both direct recurId match and recurParent match (for weekly/biweekly)
   const md = getMD(Y,M);
   const before = md.expenses.length;
-  md.expenses = md.expenses.filter(e => e.recurId !== tid);
+  md.expenses = md.expenses.filter(e => e.recurId !== tid && e.recurParent !== tid);
   if(md.expenses.length !== before){ saveMD(); }
   render();
 }
