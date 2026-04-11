@@ -200,6 +200,19 @@ main{max-width:1100px;margin:0 auto;padding:18px 14px calc(18px + var(--safe-bot
 .rzone .zpill{background:var(--rv);color:white;}
 .rzone .ztag{border:1px solid var(--rb);color:var(--rv);}
 
+/* Collapsible recurring rows */
+.rcollapsed td:nth-child(n+3){display:none;}
+.rcollapsed td:nth-child(1),.rcollapsed td:nth-child(2){display:table-cell;}
+.rcollapsed .rsum{display:inline;}
+.rsum{display:none;font-family:'DM Mono',monospace;font-size:.78rem;color:var(--slate);margin-left:6px;}
+.rexp-toggle{background:none;border:none;font-size:.6rem;color:var(--rv);cursor:pointer;padding:2px 4px;opacity:.5;vertical-align:middle;}
+.rexp-toggle:hover{opacity:1;}
+@media(max-width:640px){
+  .rcollapsed td:nth-child(n+3){display:none!important;}
+  .rcollapsed td:nth-child(1),.rcollapsed td:nth-child(2){display:block!important;}
+  .rcollapsed .rsum{display:inline;}
+}
+
 .rtable{width:100%;border-collapse:collapse;min-width:1200px;}
 .rtable thead th{font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--rv);padding:7px 10px;text-align:left;border-bottom:1px solid var(--rb);background:rgba(107,79,187,.05);white-space:nowrap;}
 .rtable tbody tr{border-bottom:1px solid rgba(197,184,232,.35);}
@@ -1237,6 +1250,12 @@ function seedMonth(y,m){
     const freq=t.frequency||'monthly';
 
     if(freq==='monthly'){
+      // Clean up any leftover multi-occurrence expenses from a previous weekly/biweekly setting
+      const multiLeftovers=md.expenses.filter(e=>e.recurParent===t.id);
+      if(multiLeftovers.length){
+        md.expenses=md.expenses.filter(e=>e.recurParent!==t.id);
+        changed=true;
+      }
       // Original behavior — one expense per month
       const existing=md.expenses.find(e=>e.recurId===t.id);
       if(!existing){
@@ -1260,6 +1279,12 @@ function seedMonth(y,m){
         }
       }
     } else {
+      // Clean up any leftover monthly expense from a previous monthly setting
+      const monthlyLeftover=md.expenses.findIndex(e=>e.recurId===t.id && !e.recurParent);
+      if(monthlyLeftover!==-1){
+        md.expenses.splice(monthlyLeftover,1);
+        changed=true;
+      }
       // Weekly or biweekly — compute occurrence dates in this month
       const dates=getRecurDates(t,y,m);
       dates.forEach((dt,idx)=>{
@@ -1490,10 +1515,18 @@ function renderRecur(){
     else if(sk) tr.className='rskip';
     // coverage preview label
     const covLabel=buildCovLabel(t);
+    const occ=freq!=='monthly'?getRecurDates(t,Y,M).length:1;
+    const moTotal=freq!=='monthly'?(parseFloat(disp)||0)*occ:(parseFloat(disp)||0);
     tr.innerHTML=`
       <td style="text-align:center"><input type="checkbox" class="rtoggle" ${t.active?'checked':''} onchange="updRecurImm(${i},'active',this.checked)"></td>
-      <td style="min-width:160px"><input type="text" value="${esc(t.name||'')}" placeholder="e.g. Internet"
-            onchange="updRecurImm(${i},'name',this.value)" style="min-width:140px"></td>
+      <td style="min-width:160px">
+        <div style="display:flex;align-items:center;">
+          <button class="rexp-toggle" onclick="this.closest('tr').classList.toggle('rcollapsed');this.textContent=this.closest('tr').classList.contains('rcollapsed')?'▶':'▼'" title="Expand/collapse">▼</button>
+          <input type="text" value="${esc(t.name||'')}" placeholder="e.g. Internet"
+            onchange="updRecurImm(${i},'name',this.value)" style="min-width:120px;flex:1">
+          <span class="rsum">${fmt(moTotal)}${freq!=='monthly'?' ('+occ+'×)':''}</span>
+        </div>
+      </td>
       <td>
         <div style="display:flex;flex-direction:column;gap:3px;">
           <div>
@@ -1527,6 +1560,7 @@ function renderRecur(){
               ${ov!==''?`<button class="ov-reset" onclick="clearOv('${esc(t.id)}')" title="Reset to usual cost">✕</button>`:''}
             </div>
           </div>
+          ${(t.frequency||'monthly')!=='monthly'&&(parseFloat(disp)||0)?'<div style="font-size:.62rem;color:var(--rv);font-family:DM Mono,monospace;margin-top:1px;">'+getRecurDates(t,Y,M).length+'× = '+fmt((parseFloat(disp)||0)*getRecurDates(t,Y,M).length)+'/mo</div>':''}
           <div>
             <span style="font-size:.55rem;font-weight:700;color:var(--rv);text-transform:uppercase;letter-spacing:.06em;">Payment Type</span>
             <select onchange="updRecurImm(${i},'payment',this.value)">
@@ -2176,9 +2210,18 @@ function renderPersSubs(who){
     if(!t.active) tr.className='ri';
     else if(sk) tr.className='rskip';
     const covLabel=buildCovLabel(t,PM,PY);
+    const pFreq=t.frequency||'monthly';
+    const pDisp=ov!==''?ov:t.amount;
+    const pMoTotal=pFreq!=='monthly'?(parseFloat(pDisp)||0)*((pFreq==='weekly')?4.33:2.17):(parseFloat(pDisp)||0);
     tr.innerHTML=`
       <td style="text-align:center"><input type="checkbox" class="rtoggle" ${t.active?'checked':''} onchange="updPSub('${who}',${i},'active',this.checked)"></td>
-      <td style="min-width:160px"><input type="text" value="${esc(t.name||'')}" placeholder="e.g. Netflix" onchange="updPSub('${who}',${i},'name',this.value)" style="min-width:140px"></td>
+      <td style="min-width:160px">
+        <div style="display:flex;align-items:center;">
+          <button class="rexp-toggle" onclick="this.closest('tr').classList.toggle('rcollapsed');this.textContent=this.closest('tr').classList.contains('rcollapsed')?'▶':'▼'" title="Expand/collapse">▼</button>
+          <input type="text" value="${esc(t.name||'')}" placeholder="e.g. Netflix" onchange="updPSub('${who}',${i},'name',this.value)" style="min-width:120px;flex:1">
+          <span class="rsum">${fmt(pMoTotal)}${pFreq!=='monthly'?' (≈/mo)':''}</span>
+        </div>
+      </td>
       <td class="rnum">
         <div style="display:flex;flex-direction:column;gap:3px;">
           <div>
@@ -2194,6 +2237,7 @@ function renderPersSubs(who){
               ${ov!==''?`<button class="ov-reset" onclick="clearPersOv('${who}','${esc(t.id)}')" title="Reset">✕</button>`:''}
             </div>
           </div>
+          ${(t.frequency||'monthly')!=='monthly'&&(parseFloat(disp)||0)?'<div style="font-size:.62rem;color:var(--rv);font-family:DM Mono,monospace;margin-top:1px;">'+((t.frequency==='weekly')?'4-5':'2-3')+'× ≈ '+fmt((parseFloat(disp)||0)*((t.frequency==='weekly')?4.33:2.17))+'/mo</div>':''}
           <div>
             <span style="font-size:.55rem;font-weight:700;color:var(--rv);text-transform:uppercase;letter-spacing:.06em;">Payment Type</span>
             <select onchange="updPSub('${who}',${i},'payment',this.value)">
