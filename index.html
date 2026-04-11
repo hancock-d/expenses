@@ -215,8 +215,8 @@ main{max-width:1100px;margin:0 auto;padding:18px 14px calc(18px + var(--safe-bot
 .rtable tbody tr{border-bottom:1px solid rgba(197,184,232,.35);}
 .rtable tbody tr:last-child{border-bottom:none;}
 .rtable tbody tr:hover{background:rgba(107,79,187,.03);}
-.rtable tbody td{padding:6px 10px;font-size:.83rem;vertical-align:middle;}
-.rtable td input,.rtable td select{font-family:'DM Sans',sans-serif;font-size:.83rem;border:1px solid transparent;border-radius:5px;padding:3px 7px;background:transparent;color:var(--ink);width:100%;min-width:0;}
+.rtable tbody td{padding:6px 10px;font-size:.82rem;vertical-align:middle;}
+.rtable td input,.rtable td select{font-family:'DM Sans',sans-serif;font-size:.82rem;border:1px solid transparent;border-radius:5px;padding:3px 6px;background:transparent;color:var(--ink);width:100%;min-width:0;}
 .rtable td input:focus,.rtable td select:focus{outline:none;border-color:var(--rv);background:white;}
 .rtable td input:hover,.rtable td select:hover{border-color:var(--rb);background:white;}
 td.rnum input{font-family:'DM Mono',monospace;text-align:right;}
@@ -527,7 +527,7 @@ input, select, textarea {
 }
 @media(min-width:641px){
   input, select, textarea { font-size: inherit !important; }
-  .rtable td input, .rtable td select { font-size: .83rem !important; }
+  .rtable td input, .rtable td select { font-size: .82rem !important; }
   .etable td input, .etable td select { font-size: .82rem !important; }
   .ctable td input, .ctable td select { font-size: .82rem !important; }
 }
@@ -1240,7 +1240,22 @@ function seedMonth(y,m){
     if(!t.active) continue;
     const freq=t.frequency||'monthly';
 
-    if(freq==='monthly'){
+    if(freq==='monthly'||freq==='annual'||freq==='semiannual'){
+      // For annual/semiannual, check if this month is an active occurrence
+      if(freq==='annual'||freq==='semiannual'){
+        const anchor=t.anchorDate;
+        if(anchor){
+          const anchorD=new Date(anchor+'T12:00:00');
+          const anchorMo=anchorD.getMonth();
+          const isActive=freq==='annual'?(m===anchorMo):(m===anchorMo||m===(anchorMo+6)%12);
+          if(!isActive){
+            // Remove any leftover expense if frequency changed to/from this month
+            const stale=md.expenses.findIndex(e=>e.recurId===t.id);
+            if(stale!==-1){ md.expenses.splice(stale,1); changed=true; }
+            continue;
+          }
+        }
+      }
       // Clean up any leftover multi-occurrence expenses from a previous weekly/biweekly setting
       const multiLeftovers=md.expenses.filter(e=>e.recurParent===t.id);
       if(multiLeftovers.length){
@@ -1494,17 +1509,18 @@ function renderRecur(){
     const disp=ov!==''?ov:t.amount;
     if(t.active&&!sk){
       cnt++;
-      if(freq==='monthly'){
-        tot+=parseFloat(disp)||0;
+      if(freq==='weekly'||freq==='biweekly'){
+        const occN=getRecurDates(t,Y,M).length;
+        tot+=(parseFloat(disp)||0)*occN;
       } else {
-        const occ=getRecurDates(t,Y,M).length;
-        tot+=(parseFloat(disp)||0)*occ;
+        // monthly, annual, semiannual — 1 occurrence (annual/semiannual only seeded if active this month)
+        tot+=parseFloat(disp)||0;
       }
     }
     const collapsed=_collapsedRecur.has(i);
     const covLabel=buildCovLabel(t);
-    const occ=freq!=='monthly'?getRecurDates(t,Y,M).length:1;
-    const moTotal=freq!=='monthly'?(parseFloat(disp)||0)*occ:(parseFloat(disp)||0);
+    const occ=freq==='weekly'||freq==='biweekly'?getRecurDates(t,Y,M).length:(freq==='annual'||freq==='semiannual'?1:1);
+    const moTotal=(parseFloat(disp)||0)*occ;
     const rowClass=!t.active?'ri':sk?'rskip':'';
 
     // Summary row
@@ -1512,8 +1528,8 @@ function renderRecur(){
     sr.className='rsummary-row'+(rowClass?' '+rowClass:'');
     sr.innerHTML=`<td colspan="7" style="padding:8px 10px;"><div style="display:flex;align-items:center;gap:6px;">
       <button class="rexp-toggle" onclick="toggleRowCollapse('recur',${i},this)">${collapsed?'▶':'▼'}</button>
-      <input type="text" value="${esc(t.name||'')}" placeholder="e.g. Internet" onchange="updRecurImm(${i},'name',this.value)" style="font-weight:500;font-size:.83rem;border:1px solid transparent;border-radius:5px;padding:2px 6px;background:transparent;font-family:'DM Sans',sans-serif;color:var(--ink);min-width:100px;flex:1;" onfocus="this.style.borderColor='var(--rv)';this.style.background='white'" onblur="this.style.borderColor='transparent';this.style.background='transparent'">
-      <span class="rsum">${fmt(moTotal)}${freq!=='monthly'?' ('+occ+'×)':''}</span>
+      <input type="text" value="${esc(t.name||'')}" placeholder="e.g. Internet" onchange="updRecurImm(${i},'name',this.value)" style="font-weight:500;font-size:.82rem;border:1px solid transparent;border-radius:5px;padding:2px 6px;background:transparent;font-family:'DM Sans',sans-serif;color:var(--ink);min-width:100px;flex:1;" onfocus="this.style.borderColor='var(--rv)';this.style.background='white'" onblur="this.style.borderColor='transparent';this.style.background='transparent'">
+      <span class="rsum">${fmt(moTotal)}${freq==='weekly'||freq==='biweekly'?' ('+occ+'×)':freq==='annual'?' (annual)':freq==='semiannual'?' (every 6 mo)':''}</span>
       ${t.notes?'<span class="ec-note" style="color:var(--rv);">'+esc(t.notes)+'</span>':''}
     </div></td>`;
     tbody.appendChild(sr);
@@ -1555,7 +1571,7 @@ function renderRecur(){
               ${ov!==''?`<button class="ov-reset" onclick="clearOv('${esc(t.id)}')" title="Reset to usual cost">✕</button>`:''}
             </div>
           </div>
-          ${(t.frequency||'monthly')!=='monthly'&&(parseFloat(disp)||0)?'<div style="font-size:.62rem;color:var(--rv);font-family:DM Mono,monospace;margin-top:1px;">'+getRecurDates(t,Y,M).length+'× = '+fmt((parseFloat(disp)||0)*getRecurDates(t,Y,M).length)+'/mo</div>':''}
+          ${(freq==='weekly'||freq==='biweekly')&&(parseFloat(disp)||0)?'<div style="font-size:.62rem;color:var(--rv);font-family:DM Mono,monospace;margin-top:1px;">'+getRecurDates(t,Y,M).length+'× = '+fmt((parseFloat(disp)||0)*getRecurDates(t,Y,M).length)+'/mo</div>':''}
           <div>
             <span style="font-size:.55rem;font-weight:700;color:var(--rv);text-transform:uppercase;letter-spacing:.06em;">Payment Type</span>
             <select onchange="updRecurImm(${i},'payment',this.value)">
@@ -1579,6 +1595,8 @@ function renderRecur(){
               <option value="monthly" ${(t.frequency||'monthly')==='monthly'?'selected':''}>Monthly</option>
               <option value="biweekly" ${t.frequency==='biweekly'?'selected':''}>Bi-weekly</option>
               <option value="weekly" ${t.frequency==='weekly'?'selected':''}>Weekly</option>
+              <option value="semiannual" ${t.frequency==='semiannual'?'selected':''}>Every 6 Months</option>
+              <option value="annual" ${t.frequency==='annual'?'selected':''}>Annual</option>
             </select>
           </div>
           ${(t.frequency||'monthly')==='monthly'?`<div>
@@ -2242,7 +2260,7 @@ function renderPersSubs(who){
     const covLabel=buildCovLabel(t,PM,PY);
     const pFreq=t.frequency||'monthly';
     const pDisp=ov!==''?ov:t.amount;
-    const pMoTotal=pFreq!=='monthly'?(parseFloat(pDisp)||0)*((pFreq==='weekly')?4.33:2.17):(parseFloat(pDisp)||0);
+    const pMoTotal=(pFreq==='weekly')?(parseFloat(pDisp)||0)*4.33:(pFreq==='biweekly')?(parseFloat(pDisp)||0)*2.17:(parseFloat(pDisp)||0);
     const rowClass=!t.active?'ri':sk?'rskip':'';
 
     // Summary row
@@ -2250,8 +2268,8 @@ function renderPersSubs(who){
     sr.className='rsummary-row'+(rowClass?' '+rowClass:'');
     sr.innerHTML=`<td colspan="6" style="padding:8px 10px;"><div style="display:flex;align-items:center;gap:6px;">
       <button class="rexp-toggle" onclick="toggleRowCollapse('precur',${i},this)">${collapsed?'▶':'▼'}</button>
-      <input type="text" value="${esc(t.name||'')}" placeholder="e.g. Netflix" onchange="updPSub('${who}',${i},'name',this.value)" style="font-weight:500;font-size:.83rem;border:1px solid transparent;border-radius:5px;padding:2px 6px;background:transparent;font-family:'DM Sans',sans-serif;color:var(--ink);min-width:100px;flex:1;" onfocus="this.style.borderColor='var(--rv)';this.style.background='white'" onblur="this.style.borderColor='transparent';this.style.background='transparent'">
-      <span class="rsum">${fmt(pMoTotal)}${pFreq!=='monthly'?' (≈/mo)':''}</span>
+      <input type="text" value="${esc(t.name||'')}" placeholder="e.g. Netflix" onchange="updPSub('${who}',${i},'name',this.value)" style="font-weight:500;font-size:.82rem;border:1px solid transparent;border-radius:5px;padding:2px 6px;background:transparent;font-family:'DM Sans',sans-serif;color:var(--ink);min-width:100px;flex:1;" onfocus="this.style.borderColor='var(--rv)';this.style.background='white'" onblur="this.style.borderColor='transparent';this.style.background='transparent'">
+      <span class="rsum">${fmt(pMoTotal)}${pFreq==='weekly'||pFreq==='biweekly'?' (≈/mo)':pFreq==='annual'?' (annual)':pFreq==='semiannual'?' (every 6 mo)':''}</span>
       ${t.notes?'<span class="ec-note" style="color:var(--rv);">'+esc(t.notes)+'</span>':''}
     </div></td>`;
     tbody.appendChild(sr);
@@ -2275,7 +2293,7 @@ function renderPersSubs(who){
               ${ov!==''?`<button class="ov-reset" onclick="clearPersOv('${who}','${esc(t.id)}')" title="Reset">✕</button>`:''}
             </div>
           </div>
-          ${(t.frequency||'monthly')!=='monthly'&&(parseFloat(disp)||0)?'<div style="font-size:.62rem;color:var(--rv);font-family:DM Mono,monospace;margin-top:1px;">'+((t.frequency==='weekly')?'4-5':'2-3')+'× ≈ '+fmt((parseFloat(disp)||0)*((t.frequency==='weekly')?4.33:2.17))+'/mo</div>':''}
+          ${(pFreq==='weekly'||pFreq==='biweekly')&&(parseFloat(disp)||0)?'<div style="font-size:.62rem;color:var(--rv);font-family:DM Mono,monospace;margin-top:1px;">'+((pFreq==='weekly')?'4-5':'2-3')+'× ≈ '+fmt((parseFloat(disp)||0)*((pFreq==='weekly')?4.33:2.17))+'/mo</div>':''}
           <div>
             <span style="font-size:.55rem;font-weight:700;color:var(--rv);text-transform:uppercase;letter-spacing:.06em;">Payment Type</span>
             <select onchange="updPSub('${who}',${i},'payment',this.value)">
@@ -2299,6 +2317,8 @@ function renderPersSubs(who){
               <option value="monthly" ${(t.frequency||'monthly')==='monthly'?'selected':''}>Monthly</option>
               <option value="biweekly" ${t.frequency==='biweekly'?'selected':''}>Bi-weekly</option>
               <option value="weekly" ${t.frequency==='weekly'?'selected':''}>Weekly</option>
+              <option value="semiannual" ${t.frequency==='semiannual'?'selected':''}>Every 6 Months</option>
+              <option value="annual" ${t.frequency==='annual'?'selected':''}>Annual</option>
             </select>
           </div>
           ${(t.frequency||'monthly')==='monthly'?`<div>
