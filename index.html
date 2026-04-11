@@ -235,6 +235,12 @@ td.rnum input{font-family:'DM Mono',monospace;text-align:right;}
 .czone .zpill{background:var(--cv);color:white;}
 .czone .ztag{border:1px solid var(--cb);color:var(--cv);}
 
+/* OTHER EXPENSES */
+.ezone{background:var(--lg);border-top:1px solid var(--border);}
+.ezone .zone-lbl,.ezone .zchev{color:var(--slate);}
+.ezone .zpill{background:var(--slate);color:white;}
+.ezone .ztag{border:1px solid var(--border);color:var(--slate);}
+
 .ctable{width:100%;border-collapse:collapse;}
 .ctable thead th{font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--cv);padding:7px 10px;text-align:left;border-bottom:1px solid var(--cb);background:rgba(46,125,82,.05);}
 .ctable tbody tr{border-bottom:1px solid rgba(168,213,184,.4);}
@@ -284,6 +290,17 @@ td.anum input{font-family:'DM Mono',monospace;font-weight:500;text-align:left;}
 .spill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:.63rem;font-weight:700;}
 .s-yes{background:#EDF4EE;color:var(--sage);}
 .s-no{background:#FEF0EB;color:var(--rust);}
+
+/* DATA TOOLS */
+.data-tools{background:white;border-radius:12px;box-shadow:var(--sh);border:1px solid var(--border);padding:16px;}
+.data-tools h2{font-family:'DM Serif Display',serif;font-size:.95rem;margin-bottom:6px;}
+.dt-desc{font-size:.75rem;color:var(--slate);margin-bottom:12px;line-height:1.4;}
+.dt-buttons{display:flex;gap:8px;flex-wrap:wrap;}
+.dt-btn{font-size:.75rem;font-weight:600;color:var(--ink);background:var(--lg);border:1px solid var(--border);border-radius:8px;padding:8px 14px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;}
+.dt-btn:hover{background:var(--cream);border-color:var(--slate);}
+.dt-btn.dt-import{background:var(--ink);color:var(--cream);border-color:var(--ink);}
+.dt-btn.dt-import:hover{background:var(--slate);}
+.dt-version{font-size:.62rem;color:var(--slate);opacity:.5;margin-top:10px;font-family:'DM Mono',monospace;}
 
 /* ══════════════════════════════
    MOBILE
@@ -665,6 +682,7 @@ input[placeholder="Optional note…"]:focus {
           </div>
           <div class="zh-r">
             <span class="ztag" id="r-total">$0.00/mo</span>
+            <button class="radd-btn" onclick="event.stopPropagation();hdrAddRecur()">+ Add</button>
             <span class="zchev" id="r-chev">▼</span>
           </div>
         </div>
@@ -686,26 +704,38 @@ input[placeholder="Optional note…"]:focus {
         </div>
       </div>
 
-      <!-- One-off expenses -->
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px 4px;background:var(--lg);border-top:1px solid var(--border);">
-        <span style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--slate);">Other Expenses</span>
-        <span id="other-total-tag" style="font-family:'DM Mono',monospace;font-size:.72rem;color:var(--slate);background:white;border:1px solid var(--border);padding:2px 8px;border-radius:6px;">$0.00</span>
+      <!-- Other Expenses -->
+      <div class="ezone">
+        <div class="zone-hdr" onclick="toggleZone('e')">
+          <div class="zh-l">
+            <span class="zone-icon" style="color:var(--slate)">📋</span>
+            <span class="zone-lbl" style="color:var(--slate)">Other Expenses</span>
+            <span class="zpill" id="e-count" style="background:var(--slate);color:white">0</span>
+          </div>
+          <div class="zh-r">
+            <span class="ztag" id="other-total-tag" style="border:1px solid var(--border);color:var(--slate)">$0.00</span>
+            <button class="radd-btn" style="color:var(--slate);border-color:var(--border);" onclick="event.stopPropagation();hdrAddExp()">+ Add</button>
+            <span class="zchev" id="e-chev" style="color:var(--slate)">▼</span>
+          </div>
+        </div>
+        <div class="zcollapse" id="e-body">
+          <table class="etable">
+            <thead><tr>
+              <th style="width:118px">Date</th>
+              <th>Description</th>
+              <th style="width:148px">Category</th>
+              <th style="width:148px">Paid By</th>
+              <th style="width:110px">Payment</th>
+              <th style="width:100px">Amount</th>
+              <th>Notes</th>
+              <th style="width:30px"></th>
+            </tr></thead>
+            <tbody id="e-tbody"></tbody>
+          </table>
+          <div id="e-empty" class="empty-state" style="display:none">No other expenses yet.</div>
+          <div style="padding:7px 12px;border-top:1px solid var(--border);background:var(--lg);"><button class="radd-btn" style="color:var(--slate);border-color:var(--border);" onclick="addExp()">+ Add Expense</button></div>
+        </div>
       </div>
-      <table class="etable">
-        <thead><tr>
-          <th style="width:118px">Date</th>
-          <th>Description</th>
-          <th style="width:148px">Category</th>
-          <th style="width:148px">Paid By</th>
-          <th style="width:110px">Payment</th>
-          <th style="width:100px">Amount</th>
-          <th>Notes</th>
-          <th style="width:30px"></th>
-        </tr></thead>
-        <tbody id="e-tbody"></tbody>
-      </table>
-      <div id="e-empty" class="empty-state" style="display:none">No other expenses yet.</div>
-      <div style="padding:7px 12px;border-top:1px solid var(--border);background:var(--lg);"><button class="radd-btn" style="color:var(--slate);border-color:var(--border);" onclick="addExp()">+ Add Expense</button></div>
       
       <!-- Credits -->
       <div class="czone">
@@ -717,6 +747,7 @@ input[placeholder="Optional note…"]:focus {
           </div>
           <div class="zh-r">
             <span class="ztag" id="c-total" style="border:1px solid var(--cb);color:var(--cv)">$0.00</span>
+            <button class="cadd-btn" onclick="event.stopPropagation();hdrAddCredit()" style="font-size:.72rem;font-weight:600;color:var(--cv);background:none;border:1px dashed var(--cb);border-radius:6px;padding:4px 12px;cursor:pointer;font-family:'DM Sans',sans-serif;">+ Add</button>
             <span class="zchev" id="c-chev" style="color:var(--cv)">▼</span>
           </div>
         </div>
@@ -760,6 +791,19 @@ input[placeholder="Optional note…"]:focus {
         </tr></thead>
         <tbody id="h-tbody"></tbody>
       </table>
+    </div>
+
+    <!-- Data Tools -->
+    <div class="data-tools">
+      <h2>Backup &amp; Export</h2>
+      <p class="dt-desc">Export everything as JSON for full backup, or as CSV for spreadsheet analysis. Import restores a previous JSON backup.</p>
+      <div class="dt-buttons">
+        <button class="dt-btn" onclick="exportJSON()">⬇ Export JSON</button>
+        <button class="dt-btn" onclick="exportCSV()">⬇ Export CSV</button>
+        <button class="dt-btn dt-import" onclick="document.getElementById('import-file').click()">⬆ Import JSON</button>
+        <input type="file" id="import-file" accept=".json,application/json" style="display:none" onchange="importJSON(this)">
+      </div>
+      <p class="dt-version">v<span id="dt-version">1.0.0</span></p>
     </div>
   </main>
 
@@ -821,6 +865,7 @@ input[placeholder="Optional note…"]:focus {
             </div>
             <div class="zh-r">
               <span class="ztag" id="ps-sub-tag">$0.00/mo</span>
+              <button class="radd-btn" onclick="event.stopPropagation();hdrAddPersSub()">+ Add</button>
               <span class="zchev" id="ps-sub-chev">▼</span>
             </div>
           </div>
@@ -840,25 +885,37 @@ input[placeholder="Optional note…"]:focus {
           </div>
         </div>
 
-        <!-- Other Expenses (same header bar as main) -->
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px 4px;background:var(--lg);border-top:1px solid var(--border);">
-          <span style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--slate);">Other Expenses</span>
-          <span id="ps-exp-tag" style="font-family:'DM Mono',monospace;font-size:.72rem;color:var(--slate);background:white;border:1px solid var(--border);padding:2px 8px;border-radius:6px;">$0.00</span>
+        <!-- Other Expenses -->
+        <div class="ezone">
+          <div class="zone-hdr" onclick="togglePersExpZone()">
+            <div class="zh-l">
+              <span class="zone-icon" style="color:var(--slate)">📋</span>
+              <span class="zone-lbl" style="color:var(--slate)">Other Expenses</span>
+              <span class="zpill" id="ps-exp-cnt" style="background:var(--slate);color:white">0</span>
+            </div>
+            <div class="zh-r">
+              <span class="ztag" id="ps-exp-tag" style="border:1px solid var(--border);color:var(--slate)">$0.00</span>
+              <button class="radd-btn" style="color:var(--slate);border-color:var(--border);" onclick="event.stopPropagation();hdrAddPersExp()">+ Add</button>
+              <span class="zchev" id="ps-exp-chev" style="color:var(--slate)">▼</span>
+            </div>
+          </div>
+          <div class="zcollapse open" id="ps-exp-body">
+            <table class="etable">
+              <thead><tr>
+                <th style="width:118px">Date</th>
+                <th>Description</th>
+                <th style="width:148px">Category</th>
+                <th style="width:110px">Payment</th>
+                <th style="width:100px">Amount</th>
+                <th>Notes</th>
+                <th style="width:30px"></th>
+              </tr></thead>
+              <tbody id="ps-exp-tbody"></tbody>
+            </table>
+            <div id="ps-exp-empty" class="empty-state" style="display:none">No other expenses yet.</div>
+            <div style="padding:7px 12px;border-top:1px solid var(--border);background:var(--lg);"><button class="radd-btn" style="color:var(--slate);border-color:var(--border);" onclick="addPersExp()">+ Add Expense</button></div>
+          </div>
         </div>
-        <table class="etable">
-          <thead><tr>
-            <th style="width:118px">Date</th>
-            <th>Description</th>
-            <th style="width:148px">Category</th>
-            <th style="width:110px">Payment</th>
-            <th style="width:100px">Amount</th>
-            <th>Notes</th>
-            <th style="width:30px"></th>
-          </tr></thead>
-          <tbody id="ps-exp-tbody"></tbody>
-        </table>
-        <div id="ps-exp-empty" class="empty-state" style="display:none">No other expenses yet.</div>
-        <div style="padding:7px 12px;border-top:1px solid var(--border);background:var(--lg);"><button class="radd-btn" style="color:var(--slate);border-color:var(--border);" onclick="addPersExp()">+ Add Expense</button></div>
 
         <!-- Credits & Refunds (green zone, same as main) -->
         <div class="czone">
@@ -870,6 +927,7 @@ input[placeholder="Optional note…"]:focus {
             </div>
             <div class="zh-r">
               <span class="ztag" id="ps-c-total" style="border:1px solid var(--cb);color:var(--cv)">$0.00</span>
+              <button class="cadd-btn" onclick="event.stopPropagation();hdrAddPersCredit()" style="font-size:.72rem;font-weight:600;color:var(--cv);background:none;border:1px dashed var(--cb);border-radius:6px;padding:4px 12px;cursor:pointer;font-family:'DM Sans',sans-serif;">+ Add</button>
               <span class="zchev" id="ps-c-chev" style="color:var(--cv)">▼</span>
             </div>
           </div>
@@ -922,7 +980,7 @@ const CATS = ['Groceries / Household','Utilities & Bills','Dining Out','Kids / C
 const MO   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MOS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DEFAULT_PIN = '1234';
-const APP_VERSION = '1.0.0'; // 2026-04-03
+const APP_VERSION = '1.1.0'; // 2026-04-05 — import/export, collapsible Other Expenses
 
 /* ════════════════════════════════════════════════
    STATE
@@ -931,7 +989,7 @@ let Y, M;
 let DB = {};
 let RECUR = [];
 let name1='Dave', name2='Lindsey';
-let rOpen=true, cOpen=false;
+let rOpen=true, cOpen=false, eOpen=true;
 // PIN state
 let pinEntry='';
 let pinMode='unlock'; // 'unlock' | 'set-new' | 'confirm-new'
@@ -1036,7 +1094,7 @@ function lockApp(){
 /* ════════════════════════════════════════════════
    STORAGE — Firebase + localStorage cache
    Structure:
-     budget/meta          → {name1,name2,recur,rOpen,cOpen,pin}
+     budget/meta          → {name1,name2,recur,rOpen,cOpen,eOpen,pin}
      budget/months/{key}  → month data
      budget/personal/{who}/months/{key} → personal month data
      budget/persMeta      → {subs, subOpen}
@@ -1050,7 +1108,7 @@ function setSyncError(){ const d=document.getElementById('sync-dot'),l=document.
 
 // Write helpers — write to Firebase AND localStorage cache
 async function saveMeta(){
-  const data={name1,name2,recur:RECUR,rOpen,cOpen};
+  const data={name1,name2,recur:RECUR,rOpen,cOpen,eOpen};
   // localStorage cache
   try{ localStorage.setItem('bgt_meta',JSON.stringify(data)); }catch(e){}
   // Firebase
@@ -1089,7 +1147,7 @@ async function loadAll(){
   try{
     const m=JSON.parse(localStorage.getItem('bgt_meta')||'{}');
     name1=m.name1||'Dave'; name2=m.name2||'Lindsey';
-    RECUR=m.recur||[]; rOpen=m.rOpen!==false; cOpen=m.cOpen===true;
+    RECUR=m.recur||[]; rOpen=m.rOpen!==false; cOpen=m.cOpen===true; eOpen=m.eOpen!==false;
     document.getElementById('name1').value=name1;
     document.getElementById('name2').value=name2;
   }catch(e){}
@@ -1105,7 +1163,7 @@ async function loadAll(){
       const meta=await window._fbGet('budget/meta');
       if(meta){
         name1=meta.name1||'Dave'; name2=meta.name2||'Lindsey';
-        RECUR=meta.recur||[]; rOpen=meta.rOpen!==false; cOpen=meta.cOpen===true;
+        RECUR=meta.recur||[]; rOpen=meta.rOpen!==false; cOpen=meta.cOpen===true; eOpen=meta.eOpen!==false;
         if(meta.pin) localStorage.setItem('bgt_pin', meta.pin);
         document.getElementById('name1').value=name1;
         document.getElementById('name2').value=name2;
@@ -1135,7 +1193,7 @@ function startListeners(){
     if(!data) return;
     const prev=JSON.stringify({name1,name2,recur:RECUR});
     name1=data.name1||'Dave'; name2=data.name2||'Lindsey';
-    RECUR=data.recur||[]; rOpen=data.rOpen!==false; cOpen=data.cOpen===true;
+    RECUR=data.recur||[]; rOpen=data.rOpen!==false; cOpen=data.cOpen===true; eOpen=data.eOpen!==false;
     if(data.pin) localStorage.setItem('bgt_pin',data.pin);
     localStorage.setItem('bgt_meta',JSON.stringify(data));
     document.getElementById('name1').value=name1;
@@ -1514,6 +1572,8 @@ function renderExpenses(){
   const oneOffTotal=oneOff.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
   const ootEl=document.getElementById('other-total-tag');
   if(ootEl) ootEl.textContent=fmt(oneOffTotal);
+  const ecEl=document.getElementById('e-count');
+  if(ecEl) ecEl.textContent=oneOff.length;
   md.expenses.forEach((e,i)=>{
     if(e.recurId) return;
     const tr=document.createElement('tr');
@@ -1542,6 +1602,7 @@ function renderExpenses(){
       <td><button class="del-btn" onclick="delExp(${i})">✕</button></td>`;
     tbody.appendChild(tr);
   });
+  setZone('e',eOpen);
 }
 
 function renderCats(){
@@ -1601,7 +1662,53 @@ function setZone(z,open){
 }
 function toggleZone(z){
   if(z==='r'){ rOpen=!rOpen; saveMeta(); setZone('r',rOpen); }
+  else if(z==='e'){ eOpen=!eOpen; saveMeta(); setZone('e',eOpen); }
   else{ cOpen=!cOpen; saveMeta(); setZone('c',cOpen); }
+}
+
+// Scroll to last row in a tbody after a short delay (lets DOM update)
+function scrollToLastRow(tbodyId, container){
+  setTimeout(()=>{
+    const tbody=document.getElementById(tbodyId);
+    if(!tbody) return;
+    const last=tbody.lastElementChild;
+    if(last){
+      const scrollEl=container||window;
+      last.scrollIntoView({behavior:'smooth',block:'center'});
+    }
+  },80);
+}
+
+// Header "+ Add" wrappers — open zone if collapsed, add item, scroll to it
+function hdrAddRecur(){
+  if(!rOpen){ rOpen=true; saveMeta(); setZone('r',true); }
+  addRecur();
+  scrollToLastRow('r-tbody');
+}
+function hdrAddExp(){
+  if(!eOpen){ eOpen=true; saveMeta(); setZone('e',true); }
+  addExp();
+  scrollToLastRow('e-tbody');
+}
+function hdrAddCredit(){
+  if(!cOpen){ cOpen=true; saveMeta(); setZone('c',true); }
+  addCredit();
+  scrollToLastRow('c-tbody');
+}
+function hdrAddPersSub(){
+  if(!persSubOpen[persWho]){ persSubOpen[persWho]=true; savePMeta(); }
+  addPersSub();
+  scrollToLastRow('ps-sub-tbody', document.getElementById('pers-overlay'));
+}
+function hdrAddPersExp(){
+  if(!persExpOpen[persWho]){ persExpOpen[persWho]=true; }
+  addPersExp();
+  scrollToLastRow('ps-exp-tbody', document.getElementById('pers-overlay'));
+}
+function hdrAddPersCredit(){
+  if(!persCreditOpen[persWho]){ persCreditOpen[persWho]=true; }
+  addPersCredit();
+  scrollToLastRow('ps-c-tbody', document.getElementById('pers-overlay'));
 }
 
 /* ════════════════════════════════════════════════
@@ -2004,6 +2111,8 @@ function renderPersExps(who){
   tbody.innerHTML='';
   const oneOff=md.expenses.filter(e=>!e.isSubSeed);
   empty.style.display=oneOff.length===0?'block':'none';
+  const pecEl=document.getElementById('ps-exp-cnt');
+  if(pecEl) pecEl.textContent=oneOff.length;
   md.expenses.forEach((e,ei)=>{
     if(e.isSubSeed) return;
     const tr=document.createElement('tr');
@@ -2028,6 +2137,9 @@ function renderPersExps(who){
       <td><button class="del-btn" onclick="delPExp('${who}',${ei})">✕</button></td>`;
     tbody.appendChild(tr);
   });
+  const peOpen=persExpOpen[who]!==false;
+  document.getElementById('ps-exp-body').classList.toggle('open',peOpen);
+  document.getElementById('ps-exp-chev').classList.toggle('open',peOpen);
   updatePersTotals(who);
 }
 
@@ -2169,10 +2281,16 @@ function delPExp(who,i){
 
 // ── Personal Credits ─────────────────────────
 let persCreditOpen = {'1':true,'2':true};
+let persExpOpen = {'1':true,'2':true};
 
 function togglePersCreditZone(){
   persCreditOpen[persWho]=!persCreditOpen[persWho];
   renderPersCredits(persWho);
+}
+
+function togglePersExpZone(){
+  persExpOpen[persWho]=!persExpOpen[persWho];
+  renderPersExps(persWho);
 }
 
 function renderPersCredits(who){
@@ -2253,6 +2371,187 @@ function showToast(msg){
 }
 
 /* ════════════════════════════════════════════════
+   IMPORT / EXPORT
+════════════════════════════════════════════════ */
+function exportJSON(){
+  const payload = {
+    appVersion: APP_VERSION,
+    exportedAt: new Date().toISOString(),
+    meta: { name1, name2, recur: RECUR, rOpen, cOpen, eOpen },
+    months: DB,
+    persMeta: { subs: PSUBS, subOpen: persSubOpen },
+    personal: { '1': PDB['1'], '2': PDB['2'] }
+  };
+  const blob = new Blob([JSON.stringify(payload,null,2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const ts = new Date().toISOString().slice(0,10);
+  a.href = url; a.download = `family-budget-backup-${ts}.json`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('JSON exported ✓');
+}
+
+function exportCSV(){
+  const rows = [];
+  // Header
+  rows.push(['Type','Source','Month','Date','Description','Category','Paid By','Payment','Amount','Notes','Skipped']);
+
+  const escapeCSV = v => {
+    const s = String(v ?? '');
+    return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+  };
+  const nameOf = pb => pb==='1'?name1 : pb==='2'?name2 : pb==='shared'?'Shared' : '';
+
+  // Joint months
+  Object.keys(DB).sort().forEach(k => {
+    const md = DB[k];
+    if(!md) return;
+    (md.expenses||[]).forEach(e => {
+      const isRecur = !!e.recurId;
+      const skipped = isRecur && md.skips && md.skips[e.recurId] ? 'yes' : '';
+      let amt = parseFloat(e.amount)||0;
+      if(!amt && isRecur){
+        const ov = md.overrides && md.overrides[e.recurId];
+        if(ov!==undefined && ov!=='') amt = parseFloat(ov)||0;
+        if(!amt){ const t = RECUR.find(r=>r.id===e.recurId); if(t) amt = parseFloat(t.amount)||0; }
+      }
+      rows.push([
+        isRecur?'Recurring':'Expense', 'Joint', k, e.date||'', e.desc||'',
+        e.cat||'', nameOf(e.paidBy), e.payment||'', amt.toFixed(2), e.notes||'', skipped
+      ]);
+    });
+    (md.credits||[]).forEach(c => {
+      rows.push([
+        'Credit','Joint',k,c.date||'',c.desc||'','',nameOf(c.to),c.payment||'',
+        (parseFloat(c.amount)||0).toFixed(2), c.notes||'', ''
+      ]);
+    });
+  });
+
+  // Personal months
+  ['1','2'].forEach(who => {
+    const pname = who==='1'?name1:name2;
+    const months = PDB[who] || {};
+    Object.keys(months).sort().forEach(k => {
+      const md = months[k];
+      if(!md) return;
+      (md.expenses||[]).forEach(e => {
+        const isSub = !!e.isSubSeed;
+        const skipped = isSub && md.skips && md.skips[e.subId] ? 'yes' : '';
+        let amt = parseFloat(e.amount)||0;
+        if(!amt && isSub){
+          const t = (PSUBS[who]||[]).find(s=>s.id===e.subId);
+          if(t) amt = parseFloat(t.amount)||0;
+        }
+        rows.push([
+          isSub?'Subscription':'Expense', pname, k, e.date||'', e.desc||'',
+          e.cat||'', pname, e.payment||'', amt.toFixed(2), e.notes||'', skipped
+        ]);
+      });
+      (md.credits||[]).forEach(c => {
+        rows.push([
+          'Credit',pname,k,c.date||'',c.desc||'','',pname,c.payment||'',
+          (parseFloat(c.amount)||0).toFixed(2), c.notes||'', ''
+        ]);
+      });
+    });
+  });
+
+  const csv = rows.map(r => r.map(escapeCSV).join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const ts = new Date().toISOString().slice(0,10);
+  a.href = url; a.download = `family-budget-export-${ts}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('CSV exported ✓');
+}
+
+async function importJSON(input){
+  const file = input.files[0];
+  if(!file) return;
+  const proceed = confirm(
+    'Import will REPLACE all current data with the contents of this file.\n\n' +
+    'Your current data will be overwritten on this device AND in Firebase (synced to all devices).\n\n' +
+    'Tip: Export a JSON backup first if you want a safety net.\n\n' +
+    'Continue with import?'
+  );
+  if(!proceed){ input.value=''; return; }
+
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+
+    if(!data.meta || !data.months){
+      alert('This file does not look like a Family Budget backup. Import cancelled.');
+      input.value='';
+      return;
+    }
+
+    showToast('Importing…');
+
+    // Restore in-memory state
+    name1 = data.meta.name1 || 'Dave';
+    name2 = data.meta.name2 || 'Lindsey';
+    RECUR = data.meta.recur || [];
+    rOpen = data.meta.rOpen !== false;
+    cOpen = data.meta.cOpen === true;
+    eOpen = data.meta.eOpen !== false;
+    DB = data.months || {};
+    PSUBS = (data.persMeta && data.persMeta.subs) || {'1':[],'2':[]};
+    persSubOpen = (data.persMeta && data.persMeta.subOpen) || {'1':true,'2':true};
+    PDB = (data.personal) || {'1':{},'2':{}};
+    if(!PDB['1']) PDB['1']={};
+    if(!PDB['2']) PDB['2']={};
+
+    // Update UI immediately
+    document.getElementById('name1').value = name1;
+    document.getElementById('name2').value = name2;
+
+    // Write everything to Firebase
+    if(window._fbSet){
+      setSyncing();
+      const writes = [];
+      writes.push(window._fbSet('budget/meta', {name1,name2,recur:RECUR,rOpen,cOpen,eOpen}));
+      writes.push(window._fbSet('persMeta/data', {subs:PSUBS, subOpen:persSubOpen}));
+      Object.keys(DB).forEach(k => {
+        writes.push(window._fbSet('months/'+k, {data: JSON.stringify(DB[k]), ts: Date.now()}));
+      });
+      ['1','2'].forEach(who => {
+        Object.keys(PDB[who]||{}).forEach(k => {
+          writes.push(window._fbSet('personal_'+who+'/'+k, {data: JSON.stringify(PDB[who][k]), ts: Date.now()}));
+        });
+      });
+      const results = await Promise.all(writes);
+      const allOk = results.every(Boolean);
+      allOk ? setSynced() : setSyncError();
+    }
+
+    // Refresh localStorage cache
+    try{
+      localStorage.setItem('bgt_meta', JSON.stringify({name1,name2,recur:RECUR,rOpen,cOpen,eOpen}));
+      localStorage.setItem('bgt_pers_meta', JSON.stringify({subs:PSUBS,subOpen:persSubOpen}));
+      Object.keys(DB).forEach(k => localStorage.setItem('bgt_'+k, JSON.stringify(DB[k])));
+      ['1','2'].forEach(who => {
+        Object.keys(PDB[who]||{}).forEach(k => {
+          localStorage.setItem('bgt_p'+who+'_'+k, JSON.stringify(PDB[who][k]));
+        });
+      });
+    }catch(e){ console.warn('localStorage cache refresh failed', e); }
+
+    render();
+    showToast('Import complete ✓');
+  } catch(err) {
+    console.error('Import failed:', err);
+    alert('Import failed: ' + err.message);
+  } finally {
+    input.value='';
+  }
+}
+
+/* ════════════════════════════════════════════════
    KEYBOARD SUPPORT FOR PIN
 ════════════════════════════════════════════════ */
 document.addEventListener('keydown',e=>{
@@ -2269,6 +2568,8 @@ document.getElementById('nextMonth').addEventListener('click',()=>changeMonth(1)
 
 (async function(){
   console.log('Family Budget v' + APP_VERSION);
+  const dtv = document.getElementById('dt-version');
+  if(dtv) dtv.textContent = APP_VERSION;
   // Show offline cache immediately while Firebase loads
   try{
     const m=JSON.parse(localStorage.getItem('bgt_meta')||'{}');
