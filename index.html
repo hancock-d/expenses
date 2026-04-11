@@ -991,6 +991,22 @@ let _collapsedCred=new Set();
 let _collapsedPRecur=new Set();
 let _collapsedPExp=new Set();
 let _collapsedPCred=new Set();
+// Restore from localStorage
+try{
+  const cs=JSON.parse(localStorage.getItem('bgt_collapsed')||'{}');
+  if(cs.r) _collapsedRecur=new Set(cs.r);
+  if(cs.e) _collapsedExp=new Set(cs.e);
+  if(cs.c) _collapsedCred=new Set(cs.c);
+  if(cs.pr) _collapsedPRecur=new Set(cs.pr);
+  if(cs.pe) _collapsedPExp=new Set(cs.pe);
+  if(cs.pc) _collapsedPCred=new Set(cs.pc);
+}catch(e){}
+function _saveCollapsed(){
+  try{localStorage.setItem('bgt_collapsed',JSON.stringify({
+    r:[..._collapsedRecur],e:[..._collapsedExp],c:[..._collapsedCred],
+    pr:[..._collapsedPRecur],pe:[..._collapsedPExp],pc:[..._collapsedPCred]
+  }));}catch(e){}
+}
 // PIN state
 let pinEntry='';
 let pinMode='unlock'; // 'unlock' | 'set-new' | 'confirm-new'
@@ -1602,7 +1618,7 @@ function renderRecur(){
             </select>
           </div>`:`<div>
             <span style="font-size:.55rem;font-weight:700;color:var(--rv);text-transform:uppercase;letter-spacing:.06em;">Anchor Date</span>
-            <input type="date" value="${t.anchorDate||''}" onchange="updRecurImm(${i},'anchorDate',this.value)" title="First occurrence — all future dates calculated from this">
+            <input type="date" value="${t.anchorDate||''}" onblur="updRecurImm(${i},'anchorDate',this.value)" title="First occurrence — all future dates calculated from this">
             ${getRecurDates(t,Y,M).length?'<div style="font-size:.6rem;color:var(--slate);margin-top:2px;">'+getRecurDates(t,Y,M).length+'× this month</div>':''}
           </div>`}
         </div>
@@ -2343,7 +2359,7 @@ function renderPersSubs(who){
             </select>
           </div>`:`<div>
             <span style="font-size:.55rem;font-weight:700;color:var(--rv);text-transform:uppercase;letter-spacing:.06em;">Anchor Date</span>
-            <input type="date" value="${t.anchorDate||''}" onchange="updPSub('${who}',${i},'anchorDate',this.value)" title="First occurrence — all future dates calculated from this">
+            <input type="date" value="${t.anchorDate||''}" onblur="updPSub('${who}',${i},'anchorDate',this.value)" title="First occurrence — all future dates calculated from this">
           </div>`}
         </div>
       </td>
@@ -2702,6 +2718,7 @@ function toggleRowCollapse(type,idx,btn){
     if(detailRow) detailRow.classList.add(type==='recur'||type==='precur'?'r-hidden':'ec-hidden');
     btn.textContent='▶';
   }
+  _saveCollapsed();
 }
 
 let toastTimer;
