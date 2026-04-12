@@ -2025,6 +2025,7 @@ function updRecurImm(i,f,v){
 // updRecur: saves only, no re-render — preserves focus while typing in text/number fields
 function updRecur(i,f,v){ RECUR[i][f]=v; saveMeta(); partialSummary(); }
 function delRecur(i){
+  if(!confirm('Delete "'+RECUR[i].name+'"? This recurring charge will be removed.')) return;
   const tid = RECUR[i].id;
   RECUR.splice(i,1);
   saveMeta();
@@ -2089,7 +2090,7 @@ function updExpPaid(i,v){
   delete md.expenses[i].joint;
   saveMD(); partialSummary(); renderCats(); renderHistory();
 }
-function delExp(i){ const md=getMD(Y,M); md.expenses.splice(i,1); saveMD(); render(); }
+function delExp(i){ const md=getMD(Y,M); if(!confirm('Delete "'+(md.expenses[i].desc||'this expense')+'"?')) return; md.expenses.splice(i,1); saveMD(); render(); }
 
 function addCredit(){
   const md=getMD(Y,M); const n=new Date();
@@ -2109,7 +2110,7 @@ function updCredit(i,f,v){
     document.getElementById('c-count').textContent=(md.credits||[]).length;
   }
 }
-function delCredit(i){ const md=getMD(Y,M); md.credits.splice(i,1); saveMD(); render(); }
+function delCredit(i){ const md=getMD(Y,M); if(!confirm('Delete "'+(md.credits[i].desc||'this credit')+'"?')) return; md.credits.splice(i,1); saveMD(); render(); }
 
 function toggleSettle(){ const md=getMD(Y,M); md.settled=!md.settled; saveMD(); render(); }
 
@@ -2547,6 +2548,7 @@ function updPSub(who,i,f,v){
   PSUBS[who][i][f]=v; savePMeta(); renderPersSubs(who); renderPersHist(who);
 }
 function delPSub(who,i){
+  if(!confirm('Delete "'+(PSUBS[who][i].name||'this subscription')+'"?')) return;
   PSUBS[who].splice(i,1); savePMeta(); renderPersSubs(who); renderPersHist(who);
 }
 function setPersOv(who,id,val){
@@ -2600,7 +2602,7 @@ function updPExpAmt(who,i,v){
   updatePersTotals(who); renderPersHist(who);
 }
 function delPExp(who,i){
-  const md=getPMD(who,PY,PM); md.expenses.splice(i,1); savePMD(who); renderPersExps(who);
+  const md=getPMD(who,PY,PM); if(!confirm('Delete "'+(md.expenses[i].desc||'this expense')+'"?')) return; md.expenses.splice(i,1); savePMD(who); renderPersExps(who);
 }
 
 // ── Personal Credits ─────────────────────────
@@ -2693,7 +2695,7 @@ function updPersCredit(who,i,f,v){
   }
 }
 function delPersCredit(who,i){
-  const md=getPMD(who,PY,PM); md.credits.splice(i,1); savePMD(who); renderPersCredits(who);
+  const md=getPMD(who,PY,PM); if(!confirm('Delete "'+(md.credits[i].desc||'this credit')+'"?')) return; md.credits.splice(i,1); savePMD(who); renderPersCredits(who);
 }
 
 /* ════════════════════════════════════════════════
