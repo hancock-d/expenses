@@ -209,6 +209,9 @@ main{max-width:1100px;margin:0 auto;padding:18px 14px calc(18px + var(--safe-bot
 .rsum{font-family:'DM Mono',monospace;font-size:.78rem;color:var(--slate);}
 .rexp-toggle{background:none;border:none;font-size:.6rem;color:var(--rv);cursor:pointer;padding:2px 4px;opacity:.5;vertical-align:middle;flex-shrink:0;}
 .rexp-toggle:hover{opacity:1;}
+.reorder-arrows{display:flex;flex-direction:column;gap:0;flex-shrink:0;margin-right:2px;}
+.reorder-btn{background:none;border:none;font-size:.5rem;color:var(--slate);cursor:pointer;padding:0 3px;line-height:1;opacity:.35;}
+.reorder-btn:hover{opacity:1;color:var(--rv);}
 
 .rtable{width:100%;border-collapse:collapse;min-width:1200px;}
 .rtable thead th{font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--rv);padding:7px 10px;text-align:left;border-bottom:1px solid var(--rb);background:rgba(107,79,187,.05);white-space:nowrap;}
@@ -1539,6 +1542,10 @@ function renderRecur(){
     const sr=document.createElement('tr');
     sr.className='rsummary-row'+(rowClass?' '+rowClass:'');
     sr.innerHTML=`<td colspan="7" style="padding:8px 10px;"><div style="display:flex;align-items:center;gap:6px;">
+      <div class="reorder-arrows">
+        <button class="reorder-btn" onclick="reorderRecur(${i},-1)" ${i===0?'disabled style="visibility:hidden"':''} title="Move up">▲</button>
+        <button class="reorder-btn" onclick="reorderRecur(${i},1)" ${i===RECUR.length-1?'disabled style="visibility:hidden"':''} title="Move down">▼</button>
+      </div>
       <button class="rexp-toggle" onclick="toggleRowCollapse('recur',${i},this)">${collapsed?'▶':'▼'}</button>
       <span contenteditable="true" style="font-weight:500;font-size:.82rem;padding:2px 6px;font-family:'DM Sans',sans-serif;color:var(--ink);min-width:60px;flex:1;outline:none;border:1px solid transparent;border-radius:5px;" onfocus="this.style.borderColor='var(--rv)';this.style.background='white'" onblur="this.style.borderColor='transparent';this.style.background='transparent';updRecurImm(${i},'name',this.textContent.trim())">${esc(t.name||'')}</span>
       <span class="rsum">${fmt(moTotal)}${freq==='weekly'||freq==='biweekly'?' ('+occ+'×)':freq==='annual'?' (annual)':freq==='semiannual'?' (every 6 mo)':''}</span>
@@ -1693,6 +1700,10 @@ function renderCredits(){
     const sr=document.createElement('tr');
     sr.className='ec-summary-row';
     sr.innerHTML=`<td colspan="7"><div style="display:flex;align-items:center;gap:4px;">
+      <div class="reorder-arrows">
+        <button class="reorder-btn" onclick="reorderCredit(${i},-1)" ${i===0?'disabled style="visibility:hidden"':''} title="Move up">▲</button>
+        <button class="reorder-btn" onclick="reorderCredit(${i},1)" ${i===(md.credits||[]).length-1?'disabled style="visibility:hidden"':''} title="Move down">▼</button>
+      </div>
       <button class="ec-toggle" onclick="toggleRowCollapse('cred',${i},this)">${collapsed?'▶':'▼'}</button>
       <span style="font-weight:500;font-size:.82rem;">${esc(c.desc||'(no description)')}</span>
       <span style="font-family:'DM Mono',monospace;font-size:.82rem;color:var(--cv);margin-left:auto;">${fmt(parseFloat(c.amount)||0)}</span>
@@ -1757,6 +1768,10 @@ function renderExpenses(){
     const sr=document.createElement('tr');
     sr.className='ec-summary-row';
     sr.innerHTML=`<td colspan="8"><div style="display:flex;align-items:center;gap:4px;">
+      <div class="reorder-arrows">
+        <button class="reorder-btn" onclick="reorderExp(${i},-1)" ${eidx===0?'disabled style="visibility:hidden"':''} title="Move up">▲</button>
+        <button class="reorder-btn" onclick="reorderExp(${i},1)" ${eidx===oneOff.length-1?'disabled style="visibility:hidden"':''} title="Move down">▼</button>
+      </div>
       <button class="ec-toggle" onclick="toggleRowCollapse('exp',${eidx},this)">${collapsed?'▶':'▼'}</button>
       <span style="font-weight:500;font-size:.82rem;">${esc(e.desc||'(no description)')}</span>
       <span style="font-family:'DM Mono',monospace;font-size:.82rem;color:var(--slate);margin-left:auto;">${fmt(parseFloat(e.amount)||0)}</span>
@@ -2114,6 +2129,51 @@ function delCredit(i){ const md=getMD(Y,M); if(!confirm('Delete "'+(md.credits[i
 
 function toggleSettle(){ const md=getMD(Y,M); md.settled=!md.settled; saveMD(); render(); }
 
+/* ── Reorder functions ─────────────────────────── */
+function _swap(arr,i,dir){
+  const j=i+dir;
+  if(j<0||j>=arr.length) return false;
+  [arr[i],arr[j]]=[arr[j],arr[i]];
+  return true;
+}
+function reorderRecur(i,dir){
+  if(_swap(RECUR,i,dir)){ saveMeta(); render(); }
+}
+function reorderExp(i,dir){
+  const md=getMD(Y,M);
+  // Get indices of non-recurring expenses only
+  const indices=[]; md.expenses.forEach((e,idx)=>{if(!e.recurId) indices.push(idx);});
+  const pos=indices.indexOf(i);
+  if(pos<0) return;
+  const j=pos+dir;
+  if(j<0||j>=indices.length) return;
+  const ai=indices[pos], bi=indices[j];
+  [md.expenses[ai],md.expenses[bi]]=[md.expenses[bi],md.expenses[ai]];
+  saveMD(); render();
+}
+function reorderCredit(i,dir){
+  const md=getMD(Y,M);
+  if(_swap(md.credits,i,dir)){ saveMD(); render(); }
+}
+function reorderPSub(who,i,dir){
+  if(_swap(PSUBS[who],i,dir)){ savePMeta(); renderPersSubs(who); renderPersHist(who); }
+}
+function reorderPExp(who,i,dir){
+  const md=getPMD(who,PY,PM);
+  const indices=[]; md.expenses.forEach((e,idx)=>{if(!e.isSubSeed) indices.push(idx);});
+  const pos=indices.indexOf(i);
+  if(pos<0) return;
+  const j=pos+dir;
+  if(j<0||j>=indices.length) return;
+  const ai=indices[pos], bi=indices[j];
+  [md.expenses[ai],md.expenses[bi]]=[md.expenses[bi],md.expenses[ai]];
+  savePMD(who); renderPersExps(who);
+}
+function reorderPCredit(who,i,dir){
+  const md=getPMD(who,PY,PM);
+  if(_swap(md.credits,i,dir)){ savePMD(who); renderPersCredits(who); }
+}
+
 function changeMonth(d){
   M+=d; if(M>11){M=0;Y++;} if(M<0){M=11;Y--;}
   seedMonth(Y,M); render();
@@ -2299,6 +2359,10 @@ function renderPersSubs(who){
     const sr=document.createElement('tr');
     sr.className='rsummary-row'+(rowClass?' '+rowClass:'');
     sr.innerHTML=`<td colspan="6" style="padding:8px 10px;"><div style="display:flex;align-items:center;gap:6px;">
+      <div class="reorder-arrows">
+        <button class="reorder-btn" onclick="reorderPSub('${who}',${i},-1)" ${i===0?'disabled style="visibility:hidden"':''} title="Move up">▲</button>
+        <button class="reorder-btn" onclick="reorderPSub('${who}',${i},1)" ${i===(PSUBS[who]||[]).length-1?'disabled style="visibility:hidden"':''} title="Move down">▼</button>
+      </div>
       <button class="rexp-toggle" onclick="toggleRowCollapse('precur',${i},this)">${collapsed?'▶':'▼'}</button>
       <span contenteditable="true" style="font-weight:500;font-size:.82rem;padding:2px 6px;font-family:'DM Sans',sans-serif;color:var(--ink);min-width:60px;flex:1;outline:none;border:1px solid transparent;border-radius:5px;" onfocus="this.style.borderColor='var(--rv)';this.style.background='white'" onblur="this.style.borderColor='transparent';this.style.background='transparent';updPSub('${who}',${i},'name',this.textContent.trim())">${esc(t.name||'')}</span>
       <span class="rsum">${fmt(pMoTotal)}${pFreq==='weekly'||pFreq==='biweekly'?' (≈/mo)':pFreq==='annual'?' (annual)':pFreq==='semiannual'?' (every 6 mo)':''}</span>
@@ -2428,6 +2492,10 @@ function renderPersExps(who){
     const sr=document.createElement('tr');
     sr.className='ec-summary-row';
     sr.innerHTML=`<td colspan="7"><div style="display:flex;align-items:center;gap:4px;">
+      <div class="reorder-arrows">
+        <button class="reorder-btn" onclick="reorderPExp('${who}',${ei},-1)" ${pidx===0?'disabled style="visibility:hidden"':''} title="Move up">▲</button>
+        <button class="reorder-btn" onclick="reorderPExp('${who}',${ei},1)" ${pidx===oneOff.length-1?'disabled style="visibility:hidden"':''} title="Move down">▼</button>
+      </div>
       <button class="ec-toggle" onclick="toggleRowCollapse('pexp',${pidx},this)">${collapsed?'▶':'▼'}</button>
       <span style="font-weight:500;font-size:.82rem;">${esc(e.desc||'(no description)')}</span>
       <span style="font-family:'DM Mono',monospace;font-size:.82rem;color:var(--slate);margin-left:auto;">${fmt(parseFloat(e.amount)||0)}</span>
@@ -2633,6 +2701,10 @@ function renderPersCredits(who){
     const sr=document.createElement('tr');
     sr.className='ec-summary-row';
     sr.innerHTML=`<td colspan="6"><div style="display:flex;align-items:center;gap:4px;">
+      <div class="reorder-arrows">
+        <button class="reorder-btn" onclick="reorderPCredit('${who}',${i},-1)" ${i===0?'disabled style="visibility:hidden"':''} title="Move up">▲</button>
+        <button class="reorder-btn" onclick="reorderPCredit('${who}',${i},1)" ${i===md.credits.length-1?'disabled style="visibility:hidden"':''} title="Move down">▼</button>
+      </div>
       <button class="ec-toggle" onclick="toggleRowCollapse('pcred',${i},this)">${collapsed?'▶':'▼'}</button>
       <span style="font-weight:500;font-size:.82rem;">${esc(c.desc||'(no description)')}</span>
       <span style="font-family:'DM Mono',monospace;font-size:.82rem;color:var(--cv);margin-left:auto;">${fmt(parseFloat(c.amount)||0)}</span>
