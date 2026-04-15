@@ -1342,6 +1342,34 @@ function seedMonth(y,m){
       }
     }
   }
+  // Auto-seed credits from recurring charges with creditAmount
+  if(!md.credits) md.credits=[];
+  for(const t of RECUR){
+    if(!t.active) continue;
+    const creditId='rc_'+t.id;
+    const sk=md.skips&&(md.skips[t.id]);
+    if(!t.creditAmount || !t.creditTo || sk){
+      // Remove auto-credit if template no longer has credit or is skipped
+      const staleIdx=md.credits.findIndex(c=>c.recurCreditId===creditId);
+      if(staleIdx!==-1){ md.credits.splice(staleIdx,1); changed=true; }
+      continue;
+    }
+    const existing=md.credits.find(c=>c.recurCreditId===creditId);
+    if(!existing){
+      md.credits.push({
+        date:chargeDate(t.chargeDay||1,y,m),
+        desc:t.name+' (auto-credit)',
+        to:t.creditTo,
+        amount:t.creditAmount,
+        recurCreditId:creditId
+      });
+      changed=true;
+    } else {
+      if(existing.amount!==t.creditAmount){ existing.amount=t.creditAmount; changed=true; }
+      if(existing.to!==t.creditTo){ existing.to=t.creditTo; changed=true; }
+      if(existing.desc!==t.name+' (auto-credit)'){ existing.desc=t.name+' (auto-credit)'; changed=true; }
+    }
+  }
   md.seeded=true;
   if(changed) saveMD();
 }
@@ -1604,6 +1632,20 @@ function renderRecur(){
               <option value="Other" ${t.payment==='Other'?'selected':''}>Other</option>
             </select>
           </div>
+          <div style="margin-top:4px;padding-top:4px;border-top:1px dashed var(--rb);">
+            <span style="font-size:.55rem;font-weight:700;color:var(--cv);text-transform:uppercase;letter-spacing:.06em;">Auto-Credit</span>
+            <div style="display:flex;gap:4px;align-items:center;margin-top:2px;">
+              <input type="number" value="${t.creditAmount||''}" placeholder="$0.00" min="0" step="0.01"
+                style="font-family:'DM Mono',monospace;flex:1;"
+                onchange="updRecurImm(${i},'creditAmount',this.value)">
+              <select onchange="updRecurImm(${i},'creditTo',this.value)" style="flex:1;">
+                <option value="" ${!t.creditTo?'selected':''}>Credit To…</option>
+                <option value="1" ${t.creditTo==='1'?'selected':''}>${name1}</option>
+                <option value="2" ${t.creditTo==='2'?'selected':''}>${name2}</option>
+                <option value="shared" ${t.creditTo==='shared'?'selected':''}>Shared</option>
+              </select>
+            </div>
+          </div>
         </div>
       </td>
       <td>
@@ -1695,6 +1737,7 @@ function renderCredits(){
   (md.credits||[]).forEach((c,i)=>{
     tot+=parseFloat(c.amount)||0;
     const collapsed=_collapsedCred.has(i);
+    const isAuto=!!c.recurCreditId;
 
     // Summary row
     const sr=document.createElement('tr');
@@ -1705,10 +1748,11 @@ function renderCredits(){
         <button class="reorder-btn" onclick="reorderCredit(${i},1)" ${i===(md.credits||[]).length-1?'disabled style="visibility:hidden"':''} title="Move down">▼</button>
       </div>
       <button class="ec-toggle" onclick="toggleRowCollapse('cred',${i},this)">${collapsed?'▶':'▼'}</button>
+      ${isAuto?'<span style="font-size:.55rem;font-weight:700;color:var(--cv);background:var(--cbg);border:1px solid var(--cb);border-radius:4px;padding:1px 5px;">AUTO</span>':''}
       <span style="font-weight:500;font-size:.82rem;">${esc(c.desc||'(no description)')}</span>
       <span style="font-family:'DM Mono',monospace;font-size:.82rem;color:var(--cv);margin-left:auto;">${fmt(parseFloat(c.amount)||0)}</span>
       ${c.notes?'<span class="ec-note">'+esc(c.notes)+'</span>':''}
-      <button class="cdel-btn" onclick="delCredit(${i})" style="margin-left:4px;">✕</button>
+      ${isAuto?'':'<button class="cdel-btn" onclick="delCredit('+i+')" style="margin-left:4px;">✕</button>'}
     </div></td>`;
     tbody.appendChild(sr);
 
@@ -1971,7 +2015,7 @@ function hdrAddPersCredit(){
 ════════════════════════════════════════════════ */
 function addRecur(){
   const t={id:'r'+Date.now(),name:'',paidBy:'1',amount:'',chargeDay:'',
-    frequency:'monthly',anchorDate:'',
+    frequency:'monthly',anchorDate:'',creditAmount:'',creditTo:'',
     covStartRef:'curr',covStartDay:'',covEndRef:'next',covEndDay:'',
     activeMonths:[1,1,1,1,1,1,1,1,1,1,1,1],active:true};
   RECUR.push(t);
@@ -2293,6 +2337,31 @@ function seedPersonalMonth(who,y,m){
       }
     }
   }
+  // Auto-seed credits from personal subs with creditAmount
+  if(!md.credits) md.credits=[];
+  for(const t of (PSUBS[who]||[])){
+    if(!t.active) continue;
+    const creditId='rpc_'+t.id;
+    const sk=md.skips&&(md.skips[t.id]);
+    if(!t.creditAmount || sk){
+      const staleIdx=md.credits.findIndex(c=>c.recurCreditId===creditId);
+      if(staleIdx!==-1){ md.credits.splice(staleIdx,1); changed=true; }
+      continue;
+    }
+    const existing=md.credits.find(c=>c.recurCreditId===creditId);
+    if(!existing){
+      md.credits.push({
+        date:'',
+        desc:t.name+' (auto-credit)',
+        amount:t.creditAmount,
+        recurCreditId:creditId
+      });
+      changed=true;
+    } else {
+      if(existing.amount!==t.creditAmount){ existing.amount=t.creditAmount; changed=true; }
+      if(existing.desc!==t.name+' (auto-credit)'){ existing.desc=t.name+' (auto-credit)'; changed=true; }
+    }
+  }
   md.seeded=true;
   if(changed) savePMD(who);
 }
@@ -2412,6 +2481,12 @@ function renderPersSubs(who){
               <option value="Check" ${t.payment==='Check'?'selected':''}>Check</option>
               <option value="Other" ${t.payment==='Other'?'selected':''}>Other</option>
             </select>
+          </div>
+          <div style="margin-top:4px;padding-top:4px;border-top:1px dashed var(--rb);">
+            <span style="font-size:.55rem;font-weight:700;color:var(--cv);text-transform:uppercase;letter-spacing:.06em;">Auto-Credit</span>
+            <input type="number" value="${t.creditAmount||''}" placeholder="$0.00" min="0" step="0.01"
+              style="font-family:'DM Mono',monospace;margin-top:2px;"
+              onchange="updPSub('${who}',${i},'creditAmount',this.value)">
           </div>
         </div>
       </td>
@@ -2615,7 +2690,7 @@ function togglePersZone(){
 function addPersSub(){
   if(!PSUBS[persWho]) PSUBS[persWho]=[];
   PSUBS[persWho].push({id:'ps'+Date.now(),name:'',amount:'',notes:'',active:true,
-    frequency:'monthly',anchorDate:'',
+    frequency:'monthly',anchorDate:'',creditAmount:'',
     chargeDay:'',covStartRef:'curr',covStartDay:'',covEndRef:'next',covEndDay:'',
     activeMonths:[1,1,1,1,1,1,1,1,1,1,1,1]});
   savePMeta();
@@ -2732,6 +2807,7 @@ function renderPersCredits(who){
   md.credits.forEach((c,i)=>{
     tot+=parseFloat(c.amount)||0;
     const collapsed=_collapsedPCred.has(i);
+    const isAuto=!!c.recurCreditId;
 
     const sr=document.createElement('tr');
     sr.className='ec-summary-row';
@@ -2741,10 +2817,11 @@ function renderPersCredits(who){
         <button class="reorder-btn" onclick="reorderPCredit('${who}',${i},1)" ${i===md.credits.length-1?'disabled style="visibility:hidden"':''} title="Move down">▼</button>
       </div>
       <button class="ec-toggle" onclick="toggleRowCollapse('pcred',${i},this)">${collapsed?'▶':'▼'}</button>
+      ${isAuto?'<span style="font-size:.55rem;font-weight:700;color:var(--cv);background:var(--cbg);border:1px solid var(--cb);border-radius:4px;padding:1px 5px;">AUTO</span>':''}
       <span style="font-weight:500;font-size:.82rem;">${esc(c.desc||'(no description)')}</span>
       <span style="font-family:'DM Mono',monospace;font-size:.82rem;color:var(--cv);margin-left:auto;">${fmt(parseFloat(c.amount)||0)}</span>
       ${c.notes?'<span class="ec-note">'+esc(c.notes)+'</span>':''}
-      <button class="cdel-btn" onclick="delPersCredit('${who}',${i})" style="margin-left:4px;">✕</button>
+      ${isAuto?'':'<button class="cdel-btn" onclick="delPersCredit(\''+who+'\','+i+')" style="margin-left:4px;">✕</button>'}
     </div></td>`;
     tbody.appendChild(sr);
 
