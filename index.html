@@ -2266,18 +2266,28 @@ function seedPersonalMonth(who,y,m){
   let changed=false;
   for(const t of (PSUBS[who]||[])){
     if(!t.active) continue;
+    const freq=t.frequency||'monthly';
+    // For annual/semiannual, auto-skip in off-months
+    if(freq==='annual'||freq==='semiannual'){
+      const anchor=t.anchorDate;
+      if(anchor){
+        const anchorD=new Date(anchor+'T12:00:00');
+        const anchorMo=anchorD.getMonth();
+        const isActive=freq==='annual'?(m===anchorMo):(m===anchorMo||m===(anchorMo+6)%12);
+        if(!isActive && !md.skips[t.id]){ md.skips[t.id]=true; changed=true; }
+        if(isActive && md.skips[t.id]){ delete md.skips[t.id]; changed=true; }
+      }
+    }
     const existing=md.expenses.find(e=>e.subId===t.id);
     if(!existing){
       md.expenses.push({
         date:'',desc:t.name,cat:'Subscriptions',paidBy:who,
         amount:t.amount||'',subId:t.id,isSubSeed:true
       });
-      // Auto-skip if this month is inactive
       const ams=t.activeMonths;
       if(ams && ams[m]===0) md.skips[t.id]=true;
       changed=true;
     } else {
-      // Sync stale data — if seeded amount is empty but template has one, update it
       if((!existing.amount || existing.amount==='') && t.amount){
         existing.amount=t.amount; changed=true;
       }
@@ -2613,7 +2623,32 @@ function addPersSub(){
   renderPersSubs(persWho); renderPersHist(persWho);
 }
 function updPSub(who,i,f,v){
-  PSUBS[who][i][f]=v; savePMeta(); renderPersSubs(who); renderPersHist(who);
+  PSUBS[who][i][f]=v; savePMeta();
+  if(f==='frequency'||f==='anchorDate'){
+    // Auto-set activeMonths for annual/semiannual
+    const t=PSUBS[who][i];
+    const fr=t.frequency||'monthly';
+    if((fr==='annual'||fr==='semiannual')&&t.anchorDate){
+      const anchorMo=new Date(t.anchorDate+'T12:00:00').getMonth();
+      if(!isNaN(anchorMo)){
+        const ams=[0,0,0,0,0,0,0,0,0,0,0,0];
+        ams[anchorMo]=1;
+        if(fr==='semiannual') ams[(anchorMo+6)%12]=1;
+        PSUBS[who][i].activeMonths=ams;
+        savePMeta();
+      }
+    } else if(fr==='monthly'||fr==='weekly'||fr==='biweekly'){
+      if(PSUBS[who][i].activeMonths&&PSUBS[who][i].activeMonths.filter(v=>v).length<=2){
+        PSUBS[who][i].activeMonths=[1,1,1,1,1,1,1,1,1,1,1,1];
+        savePMeta();
+      }
+    }
+    // Re-seed
+    const md=getPMD(who,PY,PM);
+    md.seeded=false;
+    seedPersonalMonth(who,PY,PM);
+  }
+  renderPersSubs(who); renderPersHist(who);
 }
 function delPSub(who,i){
   if(!confirm('Delete "'+(PSUBS[who][i].name||'this subscription')+'"?')) return;
