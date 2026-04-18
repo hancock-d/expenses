@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Family Budget</title>
@@ -108,7 +108,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
   width:min(72px,22vw);height:min(72px,22vw);border-radius:50%;border:1px solid rgba(255,255,255,.15);
   background:rgba(255,255,255,.08);color:white;font-family:'DM Sans',sans-serif;
   font-size:clamp(1.1rem,5vw,1.4rem);font-weight:500;cursor:pointer;transition:background .15s;
-  display:flex;align-items:center;justify-content:center;user-select:none;
+  display:flex;align-items:center;justify-content:center;user-select:none;touch-action:manipulation;
 }
 .pin-key:active,.pin-key:hover{background:rgba(255,255,255,.2);}
 .pin-key.del{font-size:1.1rem;}
@@ -207,11 +207,21 @@ main{max-width:1100px;margin:0 auto;padding:18px 14px calc(18px + var(--safe-bot
 .rdetail-row.r-hidden{display:none!important;}
 .rdetail-row.r-hidden+.rsummary-row,.rsummary-row:first-child{border-top:none;}
 .rsum{font-family:'DM Mono',monospace;font-size:.78rem;color:var(--slate);}
-.rexp-toggle{background:none;border:none;font-size:.6rem;color:var(--rv);cursor:pointer;padding:2px 4px;opacity:.5;vertical-align:middle;flex-shrink:0;}
-.rexp-toggle:hover{opacity:1;}
-.reorder-arrows{display:flex;flex-direction:column;gap:0;flex-shrink:0;margin-right:2px;}
-.reorder-btn{background:none;border:none;font-size:.5rem;color:var(--slate);cursor:pointer;padding:0 3px;line-height:1;opacity:.35;}
-.reorder-btn:hover{opacity:1;color:var(--rv);}
+.rname-edit{font-weight:500;font-size:.82rem;padding:4px 8px;font-family:'DM Sans',sans-serif;color:var(--ink);min-width:60px;flex:1;outline:none;border:1px solid var(--border);border-radius:5px;background:var(--lg);}
+.rname-edit:focus{border-color:var(--rv);background:white;}
+.rname-edit:empty::before{content:attr(data-placeholder);color:var(--slate);opacity:.5;font-style:italic;}
+@media(max-width:640px){
+  .rname-edit{font-size:16px;}
+}
+.rexp-toggle{background:var(--rbg);border:1px solid var(--rb);font-size:.65rem;color:var(--rv);cursor:pointer;padding:6px 8px;border-radius:4px;vertical-align:middle;flex-shrink:0;touch-action:manipulation;line-height:1;}
+.rexp-toggle:hover{background:var(--rb);color:white;}
+.reorder-arrows{display:flex;flex-direction:column;gap:1px;flex-shrink:0;margin-right:2px;}
+.reorder-btn{background:var(--lg);border:1px solid var(--border);font-size:.55rem;color:var(--slate);cursor:pointer;padding:4px 6px;line-height:1;border-radius:3px;touch-action:manipulation;}
+.reorder-btn:hover{background:var(--border);color:var(--rv);}
+
+/* Expense/credit toggle */
+.ec-toggle{background:var(--lg);border:1px solid var(--border);font-size:.65rem;color:var(--slate);cursor:pointer;padding:6px 8px;border-radius:4px;vertical-align:middle;flex-shrink:0;touch-action:manipulation;line-height:1;}
+.ec-toggle:hover{background:var(--border);}
 
 .rtable{width:100%;border-collapse:collapse;min-width:1200px;}
 .rtable thead th{font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--rv);padding:7px 10px;text-align:left;border-bottom:1px solid var(--rb);background:rgba(107,79,187,.05);white-space:nowrap;}
@@ -267,8 +277,8 @@ td.cnum input{font-family:'DM Mono',monospace;text-align:left;}
 .cadd-row{padding:7px 12px;border-top:1px solid var(--cb);background:rgba(46,125,82,.02);}
 .cadd-btn{font-size:.72rem;font-weight:600;color:var(--cv);background:none;border:1px dashed var(--cb);border-radius:6px;padding:4px 12px;cursor:pointer;font-family:'DM Sans',sans-serif;}
 .cadd-btn:hover{background:white;border-color:var(--cv);}
-.cdel-btn{background:none;border:none;color:#ccc;cursor:pointer;font-size:.9rem;padding:2px 6px;border-radius:4px;}
-.cdel-btn:hover{color:var(--cv);background:rgba(46,125,82,.08);}
+.cdel-btn{background:none;border:1px solid #ddd;color:#999;cursor:pointer;font-size:.8rem;padding:4px 8px;border-radius:4px;touch-action:manipulation;}
+.cdel-btn:hover{color:var(--cv);background:rgba(46,125,82,.08);border-color:var(--cv);}
 
 /* EXPENSE TABLE */
 .etable{width:100%;border-collapse:collapse;}
@@ -281,16 +291,14 @@ td.cnum input{font-family:'DM Mono',monospace;text-align:left;}
 .etable td input:hover,.etable td select:hover{border-color:var(--border);background:var(--lg);}
 .etable td input:focus,.etable td select:focus{outline:none;border-color:var(--slate);background:white;}
 td.anum input{font-family:'DM Mono',monospace;font-weight:500;text-align:left;}
-.del-btn{background:none;border:none;color:#ccc;cursor:pointer;font-size:.9rem;padding:2px 6px;border-radius:4px;}
-.del-btn:hover{color:var(--rust);background:#FEF0EB;}
+.del-btn{background:none;border:1px solid #ddd;color:#999;cursor:pointer;font-size:.8rem;padding:4px 8px;border-radius:4px;touch-action:manipulation;}
+.del-btn:hover{color:var(--rust);background:#FEF0EB;border-color:var(--rust);}
 .empty-state{text-align:center;padding:24px 16px;color:var(--slate);font-size:.85rem;}
 
 /* Collapsible expense/credit rows */
 .ec-summary-row td{padding:6px 10px;border-bottom:1px solid var(--lg);}
 .ec-summary-row:hover td{background:#FDFAF6;}
 .ec-detail-row.ec-hidden{display:none!important;}
-.ec-toggle{background:none;border:none;font-size:.6rem;color:var(--slate);cursor:pointer;padding:2px 4px;opacity:.5;vertical-align:middle;flex-shrink:0;}
-.ec-toggle:hover{opacity:1;}
 .ec-note{font-size:.7rem;color:var(--slate);font-style:italic;margin-left:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px;display:inline-block;vertical-align:middle;}
 
 /* CATEGORY */
@@ -525,14 +533,11 @@ td.anum input{font-family:'DM Mono',monospace;font-weight:500;text-align:left;}
 
 
 /* ── PREVENT IOS ZOOM ON INPUT FOCUS ── */
-input, select, textarea {
-  font-size: 16px !important;
+@media(max-width:640px){
+  input, select, textarea { font-size: 16px !important; }
 }
 @media(min-width:641px){
-  input, select, textarea { font-size: inherit !important; }
-  .rtable td input, .rtable td select { font-size: .82rem !important; }
-  .etable td input, .etable td select { font-size: .82rem !important; }
-  .ctable td input, .ctable td select { font-size: .82rem !important; }
+  input, select, textarea { font-size: inherit; }
 }
 
 /* ── ACTIVE MONTHS STRIP ── */
@@ -1209,8 +1214,10 @@ function startListeners(){
   _listenersActive=true;
 
   // Listen to meta (names, RECUR templates)
+  let _suppressRender=false;
   window._fbListen('budget/meta', data=>{
     if(!data) return;
+    if(_suppressRender) return;
     const prev=JSON.stringify({name1,name2,recur:RECUR});
     name1=data.name1||'Dave'; name2=data.name2||'Lindsey';
     RECUR=data.recur||[]; rOpen=data.rOpen!==false; cOpen=data.cOpen===true; eOpen=data.eOpen!==false;
@@ -1220,6 +1227,7 @@ function startListeners(){
     document.getElementById('name2').value=name2;
     render(); showToast('↻ Synced');
   });
+  window._suppressRender=(v)=>{_suppressRender=v;};
 
   // Listen to current month — re-listen when month changes
   listenCurrentMonth();
@@ -1575,9 +1583,10 @@ function renderRecur(){
         <button class="reorder-btn" onclick="reorderRecur(${i},1)" ${i===RECUR.length-1?'disabled style="visibility:hidden"':''} title="Move down">▼</button>
       </div>
       <button class="rexp-toggle" onclick="toggleRowCollapse('recur',${i},this)">${collapsed?'▶':'▼'}</button>
-      <span contenteditable="true" style="font-weight:500;font-size:.82rem;padding:2px 6px;font-family:'DM Sans',sans-serif;color:var(--ink);min-width:60px;flex:1;outline:none;border:1px solid transparent;border-radius:5px;" onfocus="this.style.borderColor='var(--rv)';this.style.background='white'" onblur="this.style.borderColor='transparent';this.style.background='transparent';updRecurImm(${i},'name',this.textContent.trim())">${esc(t.name||'')}</span>
+      <span contenteditable="true" class="rname-edit" data-placeholder="Enter charge name…" onblur="const _n=this.textContent.trim();setTimeout(()=>updRecur(${i},'name',_n),150)">${esc(t.name||'')}</span>
       <span class="rsum">${fmt(moTotal)}${freq==='weekly'||freq==='biweekly'?' ('+occ+'×)':freq==='annual'?' (annual)':freq==='semiannual'?' (every 6 mo)':''}</span>
       ${t.notes?'<span class="ec-note" style="color:var(--rv);">'+esc(t.notes)+'</span>':''}
+      <button class="del-btn" onclick="confirmDel(this,()=>delRecur(${i}))" style="margin-left:4px;" title="Delete">✕</button>
     </div></td>`;
     tbody.appendChild(sr);
 
@@ -1702,7 +1711,7 @@ function renderRecur(){
         </div>
       </td>
       <td><input type="text" value="${esc(t.notes||'')}" placeholder="Optional note…" onchange="updRecurImm(${i},'notes',this.value)" style="min-width:120px">
-        <div style="margin-top:6px;"><button class="rdel-btn" onclick="delRecur(${i})">Delete</button></div>
+        <div style="margin-top:6px;"><button class="rdel-btn" onclick="confirmDel(this,()=>delRecur(${i}))">Delete</button></div>
       </td>`;
     tbody.appendChild(dr);
   });
@@ -1752,7 +1761,7 @@ function renderCredits(){
       <span style="font-weight:500;font-size:.82rem;">${esc(c.desc||'(no description)')}</span>
       <span style="font-family:'DM Mono',monospace;font-size:.82rem;color:var(--cv);margin-left:auto;">${fmt(parseFloat(c.amount)||0)}</span>
       ${c.notes?'<span class="ec-note">'+esc(c.notes)+'</span>':''}
-      ${isAuto?'':'<button class="cdel-btn" onclick="delCredit('+i+')" style="margin-left:4px;">✕</button>'}
+      ${isAuto?'':'<button class="cdel-btn" onclick="confirmDel(this,()=>delCredit('+i+'))" style="margin-left:4px;">✕</button>'}
     </div></td>`;
     tbody.appendChild(sr);
 
@@ -1780,7 +1789,7 @@ function renderCredits(){
       </select></td>
       <td class="cnum"><input type="number" value="${c.amount||''}" placeholder="0.00" min="0" step="0.01" onchange="updCredit(${i},'amount',this.value)"></td>
       <td><input type="text" value="${esc(c.notes||'')}" placeholder="Optional note…" onchange="updCredit(${i},'notes',this.value)" style="min-width:100px"></td>
-      <td><button class="cdel-btn" onclick="delCredit(${i})">✕</button></td>`;
+      <td><button class="cdel-btn" onclick="confirmDel(this,()=>delCredit(${i}))">✕</button></td>`;
     tbody.appendChild(dr);
   });
   const cnt=(md.credits||[]).length;
@@ -1820,7 +1829,7 @@ function renderExpenses(){
       <span style="font-weight:500;font-size:.82rem;">${esc(e.desc||'(no description)')}</span>
       <span style="font-family:'DM Mono',monospace;font-size:.82rem;color:var(--slate);margin-left:auto;">${fmt(parseFloat(e.amount)||0)}</span>
       ${e.notes?'<span class="ec-note">'+esc(e.notes)+'</span>':''}
-      <button class="del-btn" onclick="delExp(${i})" style="margin-left:4px;">✕</button>
+      <button class="del-btn" onclick="confirmDel(this,()=>delExp(${i}))" style="margin-left:4px;">✕</button>
     </div></td>`;
     tbody.appendChild(sr);
 
@@ -1850,7 +1859,7 @@ function renderExpenses(){
       </select></td>
       <td class="anum"><input type="number" value="${e.amount||''}" placeholder="0.00" min="0" step="0.01" onchange="updExp(${i},'amount',this.value)"></td>
       <td><input type="text" value="${esc(e.notes||'')}" placeholder="Optional note…" onchange="updExp(${i},'notes',this.value)" style="min-width:100px"></td>
-      <td><button class="del-btn" onclick="delExp(${i})">✕</button></td>`;
+      <td><button class="del-btn" onclick="confirmDel(this,()=>delExp(${i}))">✕</button></td>`;
     tbody.appendChild(dr);
     expIdx++;
   });
@@ -2083,17 +2092,29 @@ function updRecurImm(i,f,v){
 }
 // updRecur: saves only, no re-render — preserves focus while typing in text/number fields
 function updRecur(i,f,v){ RECUR[i][f]=v; saveMeta(); partialSummary(); }
+let _pendingDelete=null;
 function delRecur(i){
-  if(!confirm('Delete "'+RECUR[i].name+'"? This recurring charge will be removed.')) return;
-  const tid = RECUR[i].id;
+  const tid=RECUR[i].id;
   RECUR.splice(i,1);
   saveMeta();
-  // Remove seeded expenses — both direct recurId match and recurParent match (for weekly/biweekly)
   const md = getMD(Y,M);
-  const before = md.expenses.length;
   md.expenses = md.expenses.filter(e => e.recurId !== tid && e.recurParent !== tid);
-  if(md.expenses.length !== before){ saveMD(); }
+  // Also remove auto-credits for this charge
+  if(md.credits) md.credits = md.credits.filter(c => c.recurCreditId !== 'rc_'+tid);
+  saveMD();
   render();
+}
+function confirmDel(btn,fn){
+  if(btn.dataset.armed==='true'){
+    try{ fn(); }catch(e){ console.error('Delete failed:',e); }
+    return;
+  }
+  document.querySelectorAll('[data-armed="true"]').forEach(b=>{b.dataset.armed='';b.textContent=b.dataset.origText||'✕';b.style.color='';b.style.borderColor='';b.style.background='';});
+  btn.dataset.armed='true';
+  btn.dataset.origText=btn.textContent;
+  btn.textContent='Sure?';
+  btn.style.color='var(--rust)';btn.style.borderColor='var(--rust)';btn.style.background='#FEF0EB';
+  setTimeout(()=>{if(btn.dataset.armed==='true'){btn.dataset.armed='';btn.textContent=btn.dataset.origText||'✕';btn.style.color='';btn.style.borderColor='';btn.style.background='';}},3000);
 }
 
 function toggleActiveMo(id,i,mi){
@@ -2149,7 +2170,7 @@ function updExpPaid(i,v){
   delete md.expenses[i].joint;
   saveMD(); partialSummary(); renderCats(); renderHistory();
 }
-function delExp(i){ const md=getMD(Y,M); if(!confirm('Delete "'+(md.expenses[i].desc||'this expense')+'"?')) return; md.expenses.splice(i,1); saveMD(); render(); }
+function delExp(i){ const md=getMD(Y,M); md.expenses.splice(i,1); saveMD(); render(); }
 
 function addCredit(){
   const md=getMD(Y,M); const n=new Date();
@@ -2169,7 +2190,7 @@ function updCredit(i,f,v){
     document.getElementById('c-count').textContent=(md.credits||[]).length;
   }
 }
-function delCredit(i){ const md=getMD(Y,M); if(!confirm('Delete "'+(md.credits[i].desc||'this credit')+'"?')) return; md.credits.splice(i,1); saveMD(); render(); }
+function delCredit(i){ const md=getMD(Y,M); md.credits.splice(i,1); saveMD(); render(); }
 
 function toggleSettle(){ const md=getMD(Y,M); md.settled=!md.settled; saveMD(); render(); }
 
@@ -2443,9 +2464,10 @@ function renderPersSubs(who){
         <button class="reorder-btn" onclick="reorderPSub('${who}',${i},1)" ${i===(PSUBS[who]||[]).length-1?'disabled style="visibility:hidden"':''} title="Move down">▼</button>
       </div>
       <button class="rexp-toggle" onclick="toggleRowCollapse('precur',${i},this)">${collapsed?'▶':'▼'}</button>
-      <span contenteditable="true" style="font-weight:500;font-size:.82rem;padding:2px 6px;font-family:'DM Sans',sans-serif;color:var(--ink);min-width:60px;flex:1;outline:none;border:1px solid transparent;border-radius:5px;" onfocus="this.style.borderColor='var(--rv)';this.style.background='white'" onblur="this.style.borderColor='transparent';this.style.background='transparent';updPSub('${who}',${i},'name',this.textContent.trim())">${esc(t.name||'')}</span>
+      <span contenteditable="true" class="rname-edit" data-placeholder="Enter subscription name…" onblur="const _n=this.textContent.trim();setTimeout(()=>{PSUBS['${who}'][${i}].name=_n;savePMeta();},150)">${esc(t.name||'')}</span>
       <span class="rsum">${fmt(pMoTotal)}${pFreq==='weekly'||pFreq==='biweekly'?' (≈/mo)':pFreq==='annual'?' (annual)':pFreq==='semiannual'?' (every 6 mo)':''}</span>
       ${t.notes?'<span class="ec-note" style="color:var(--rv);">'+esc(t.notes)+'</span>':''}
+      <button class="del-btn" onclick="confirmDel(this,()=>delPSub('${who}',${i}))" style="margin-left:4px;" title="Delete">✕</button>
     </div></td>`;
     tbody.appendChild(sr);
 
@@ -2543,7 +2565,7 @@ function renderPersSubs(who){
         </div>
       </td>
       <td><input type="text" value="${esc(t.notes||'')}" placeholder="Optional note…" onchange="updPSub('${who}',${i},'notes',this.value)" style="min-width:120px">
-        <div style="margin-top:6px;"><button class="rdel-btn" onclick="delPSub('${who}',${i})">Delete</button></div>
+        <div style="margin-top:6px;"><button class="rdel-btn" onclick="confirmDel(this,()=>delPSub('${who}',${i}))">Delete</button></div>
       </td>`;
     tbody.appendChild(tr);
   });
@@ -2585,7 +2607,7 @@ function renderPersExps(who){
       <span style="font-weight:500;font-size:.82rem;">${esc(e.desc||'(no description)')}</span>
       <span style="font-family:'DM Mono',monospace;font-size:.82rem;color:var(--slate);margin-left:auto;">${fmt(parseFloat(e.amount)||0)}</span>
       ${e.notes?'<span class="ec-note">'+esc(e.notes)+'</span>':''}
-      <button class="del-btn" onclick="delPExp('${who}',${ei})" style="margin-left:4px;">✕</button>
+      <button class="del-btn" onclick="confirmDel(this,()=>delPExp('${who}',${ei}))" style="margin-left:4px;">✕</button>
     </div></td>`;
     tbody.appendChild(sr);
 
@@ -2610,7 +2632,7 @@ function renderPersExps(who){
       </select></td>
       <td class="anum"><input type="number" value="${e.amount||''}" placeholder="0.00" min="0" step="0.01" onchange="updPExpAmt('${who}',${ei},this.value)"></td>
       <td><input type="text" value="${esc(e.notes||'')}" placeholder="Optional note…" onchange="updPExp('${who}',${ei},'notes',this.value)" style="min-width:100px"></td>
-      <td><button class="del-btn" onclick="delPExp('${who}',${ei})">✕</button></td>`;
+      <td><button class="del-btn" onclick="confirmDel(this,()=>delPExp('${who}',${ei}))">✕</button></td>`;
     tbody.appendChild(dr);
     pExpIdx++;
   });
@@ -2726,7 +2748,6 @@ function updPSub(who,i,f,v){
   renderPersSubs(who); renderPersHist(who);
 }
 function delPSub(who,i){
-  if(!confirm('Delete "'+(PSUBS[who][i].name||'this subscription')+'"?')) return;
   PSUBS[who].splice(i,1); savePMeta(); renderPersSubs(who); renderPersHist(who);
 }
 function setPersOv(who,id,val){
@@ -2780,7 +2801,7 @@ function updPExpAmt(who,i,v){
   updatePersTotals(who); renderPersHist(who);
 }
 function delPExp(who,i){
-  const md=getPMD(who,PY,PM); if(!confirm('Delete "'+(md.expenses[i].desc||'this expense')+'"?')) return; md.expenses.splice(i,1); savePMD(who); renderPersExps(who);
+  const md=getPMD(who,PY,PM); md.expenses.splice(i,1); savePMD(who); renderPersExps(who);
 }
 
 // ── Personal Credits ─────────────────────────
@@ -2821,7 +2842,7 @@ function renderPersCredits(who){
       <span style="font-weight:500;font-size:.82rem;">${esc(c.desc||'(no description)')}</span>
       <span style="font-family:'DM Mono',monospace;font-size:.82rem;color:var(--cv);margin-left:auto;">${fmt(parseFloat(c.amount)||0)}</span>
       ${c.notes?'<span class="ec-note">'+esc(c.notes)+'</span>':''}
-      ${isAuto?'':'<button class="cdel-btn" onclick="delPersCredit(\''+who+'\','+i+')" style="margin-left:4px;">✕</button>'}
+      ${isAuto?'':'<button class="cdel-btn" onclick="confirmDel(this,()=>delPersCredit(\'${who}\',${i}))" style="margin-left:4px;">✕</button>'}
     </div></td>`;
     tbody.appendChild(sr);
 
@@ -2843,7 +2864,7 @@ function renderPersCredits(who){
       </select></td>
       <td class="cnum"><input type="number" value="${c.amount||''}" placeholder="0.00" min="0" step="0.01" onchange="updPersCredit('${who}',${i},'amount',this.value)"></td>
       <td><input type="text" value="${esc(c.notes||'')}" placeholder="Optional note…" onchange="updPersCredit('${who}',${i},'notes',this.value)"></td>
-      <td><button class="cdel-btn" onclick="delPersCredit('${who}',${i})">✕</button></td>`;
+      <td><button class="cdel-btn" onclick="confirmDel(this,()=>delPersCredit('${who}',${i}))">✕</button></td>`;
     tbody.appendChild(dr);
   });
   const cnt=md.credits.length;
@@ -2879,7 +2900,7 @@ function updPersCredit(who,i,f,v){
   }
 }
 function delPersCredit(who,i){
-  const md=getPMD(who,PY,PM); if(!confirm('Delete "'+(md.credits[i].desc||'this credit')+'"?')) return; md.credits.splice(i,1); savePMD(who); renderPersCredits(who);
+  const md=getPMD(who,PY,PM); md.credits.splice(i,1); savePMD(who); renderPersCredits(who);
 }
 
 /* ════════════════════════════════════════════════
