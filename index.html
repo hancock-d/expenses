@@ -633,23 +633,23 @@ input[placeholder="Optional note…"]:focus {
     <div class="names-row">
       <div class="name-field">
         <span class="ndot" style="background:var(--p1)"></span>
-        <input type="text" id="name1" value="Dave" onchange="saveNames();render()">
+        <input type="text" id="name1" value="Person 1" onchange="saveNames();render()">
       </div>
       <div class="name-field">
         <span class="ndot" style="background:var(--p2)"></span>
-        <input type="text" id="name2" value="Lindsey" onchange="saveNames();render()">
+        <input type="text" id="name2" value="Person 2" onchange="saveNames();render()">
       </div>
     </div>
 
     <!-- Summary -->
     <div class="summary-bar">
       <div class="card p1c pers-card" onclick="openPersonal(1)" title="View personal tracker">
-        <div class="card-label" id="lbl1">Dave</div>
+        <div class="card-label" id="lbl1">Person 1</div>
         <div class="card-value" id="vp1">$0.00</div>
         <div class="card-sub">total, after credits <span class="tap-hint">tap to open ›</span></div>
       </div>
       <div class="card p2c pers-card" onclick="openPersonal(2)" title="View personal tracker">
-        <div class="card-label" id="lbl2">Lindsey</div>
+        <div class="card-label" id="lbl2">Person 2</div>
         <div class="card-value" id="vp2">$0.00</div>
         <div class="card-sub">total, after credits <span class="tap-hint">tap to open ›</span></div>
       </div>
@@ -785,8 +785,8 @@ input[placeholder="Optional note…"]:focus {
       <table class="htable">
         <thead><tr>
           <th>Month</th>
-          <th id="h1">Dave</th>
-          <th id="h2">Lindsey</th>
+          <th id="h1">Person 1</th>
+          <th id="h2">Person 2</th>
           <th>Balance</th>
           <th>Carryover</th>
           <th>Status</th>
@@ -814,7 +814,7 @@ input[placeholder="Optional note…"]:focus {
     <div class="pers-header">
       <button class="pers-back" onclick="closePersonal()">&#8592;</button>
       <div class="pers-header-title">
-        <h2 id="pers-name">Dave</h2>
+        <h2 id="pers-name">Person 1</h2>
         <p>Personal Tracker — not shared with the joint budget</p>
       </div>
       <div class="pers-month-nav">
@@ -982,7 +982,7 @@ const CATS = ['Groceries / Household','Utilities & Bills','Dining Out','Kids / C
 const MO   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MOS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DEFAULT_PIN = '1234';
-const APP_VERSION = '1.2.0'; // 2026-04-05 — sparklines, biweekly/weekly, import/export
+const APP_VERSION = '1.3.0'; // 2026-04 — collapsible rows, reorder, auto-credits, annual/semiannual, confirmDel, tech debt cleanup
 
 /* ════════════════════════════════════════════════
    STATE
@@ -990,7 +990,7 @@ const APP_VERSION = '1.2.0'; // 2026-04-05 — sparklines, biweekly/weekly, impo
 let Y, M;
 let DB = {};
 let RECUR = [];
-let name1='Dave', name2='Lindsey';
+let name1='Person 1', name2='Person 2';
 let rOpen=true, cOpen=false, eOpen=true;
 // Track collapsed row indices across re-renders
 let _collapsedRecur=new Set();
@@ -1139,7 +1139,7 @@ async function saveMeta(){
   // Firebase
   if(window._fbSet){ setSyncing(); const ok=await window._fbSet('budget/meta',data); ok?setSynced():setSyncError(); }
 }
-function saveNames(){ name1=document.getElementById('name1').value||'Dave'; name2=document.getElementById('name2').value||'Lindsey'; saveMeta(); }
+function saveNames(){ name1=document.getElementById('name1').value||'Person 1'; name2=document.getElementById('name2').value||'Person 2'; saveMeta(); }
 
 function mk(y,m){ return `${y}-${String(m+1).padStart(2,'0')}`; }
 function getMD(y,m){
@@ -1171,7 +1171,7 @@ async function loadAll(){
   // First load from localStorage cache for instant display
   try{
     const m=JSON.parse(localStorage.getItem('bgt_meta')||'{}');
-    name1=m.name1||'Dave'; name2=m.name2||'Lindsey';
+    name1=m.name1||'Person 1'; name2=m.name2||'Person 2';
     RECUR=m.recur||[]; rOpen=m.rOpen!==false; cOpen=m.cOpen===true; eOpen=m.eOpen!==false;
     document.getElementById('name1').value=name1;
     document.getElementById('name2').value=name2;
@@ -1187,7 +1187,7 @@ async function loadAll(){
     try{
       const meta=await window._fbGet('budget/meta');
       if(meta){
-        name1=meta.name1||'Dave'; name2=meta.name2||'Lindsey';
+        name1=meta.name1||'Person 1'; name2=meta.name2||'Person 2';
         RECUR=meta.recur||[]; rOpen=meta.rOpen!==false; cOpen=meta.cOpen===true; eOpen=meta.eOpen!==false;
         if(meta.pin) localStorage.setItem('bgt_pin', meta.pin);
         document.getElementById('name1').value=name1;
@@ -1214,12 +1214,10 @@ function startListeners(){
   _listenersActive=true;
 
   // Listen to meta (names, RECUR templates)
-  let _suppressRender=false;
   window._fbListen('budget/meta', data=>{
     if(!data) return;
-    if(_suppressRender) return;
     const prev=JSON.stringify({name1,name2,recur:RECUR});
-    name1=data.name1||'Dave'; name2=data.name2||'Lindsey';
+    name1=data.name1||'Person 1'; name2=data.name2||'Person 2';
     RECUR=data.recur||[]; rOpen=data.rOpen!==false; cOpen=data.cOpen===true; eOpen=data.eOpen!==false;
     if(data.pin) localStorage.setItem('bgt_pin',data.pin);
     localStorage.setItem('bgt_meta',JSON.stringify(data));
@@ -1227,7 +1225,6 @@ function startListeners(){
     document.getElementById('name2').value=name2;
     render(); showToast('↻ Synced');
   });
-  window._suppressRender=(v)=>{_suppressRender=v;};
 
   // Listen to current month — re-listen when month changes
   listenCurrentMonth();
@@ -1895,7 +1892,7 @@ function renderCats(){
     const catTots={}; CATS.forEach(c=>catTots[c]=0);
     if(smd){
       for(const e of (smd.expenses||[])){
-        if(e.recurId&&smd.skips&&smd.skips[e.recurId]) continue;
+        if(e.recurId&&smd.skips&&(smd.skips[e.recurId]||smd.skips[e.recurParent])) continue;
         let a=parseFloat(e.amount)||0;
         if(!a && e.recurId){
           const ov=smd.overrides&&smd.overrides[e.recurId];
@@ -2067,7 +2064,7 @@ function updRecurImm(i,f,v){
     return;
   }
   // Sync seeded expense(s) in current month for fields that affect totals
-  if(f==='amount'||f==='paidBy'||f==='name'){
+  if(f==='amount'||f==='paidBy'||f==='name'||f==='cat'){
     const md=getMD(Y,M);
     const tid=RECUR[i].id;
     for(const e of md.expenses){
@@ -2075,6 +2072,7 @@ function updRecurImm(i,f,v){
       if(e.recurId===tid || e.recurParent===tid){
         if(f==='amount') e.amount=v;
         if(f==='paidBy') e.paidBy=v;
+        if(f==='cat') e.cat=v;
         if(f==='name'){
           if(e.recurParent===tid){
             // Multi-occurrence: keep the ordinal suffix
@@ -2092,7 +2090,6 @@ function updRecurImm(i,f,v){
 }
 // updRecur: saves only, no re-render — preserves focus while typing in text/number fields
 function updRecur(i,f,v){ RECUR[i][f]=v; saveMeta(); partialSummary(); }
-let _pendingDelete=null;
 function delRecur(i){
   const tid=RECUR[i].id;
   RECUR.splice(i,1);
@@ -2291,7 +2288,7 @@ async function loadPersonal(){
       for(const who of ['1','2']){
         const keys=Array.from({length:24},(_,i)=>{
           const d=new Date(); d.setMonth(d.getMonth()-12+i);
-          return pmk(d.getFullYear(),d.getMonth());
+          return mk(d.getFullYear(),d.getMonth());
         });
         await Promise.all(keys.map(async k=>{
           const doc=await window._fbGet('personal_'+who+'/'+k);
@@ -2307,7 +2304,7 @@ async function savePMeta(){
   if(window._fbSet){ setSyncing(); const ok=await window._fbSet('persMeta/data',data); ok?setSynced():setSyncError(); }
 }
 function getPMD(who,y,m){
-  const k=pmk(y,m);
+  const k=mk(y,m);
   if(!PDB[who]) PDB[who]={};
   if(!PDB[who][k]) PDB[who][k]={expenses:[],credits:[],seeded:false,skips:{},overrides:{}};
   if(!PDB[who][k].credits) PDB[who][k].credits=[];
@@ -2317,13 +2314,12 @@ function getPMD(who,y,m){
 }
 async function savePMD(who){
   // NOTE: uses global PY/PM — only safe when called from the currently viewed personal month context
-  const k=pmk(PY,PM);
+  const k=mk(PY,PM);
   const data=PDB[who][k];
   try{ localStorage.setItem('bgt_p'+who+'_'+k, JSON.stringify(data)); }catch(e){}
   if(window._fbSet){ setSyncing(); const ok=await window._fbSet('personal_'+who+'/'+k,{data:JSON.stringify(data)}); ok?setSynced():setSyncError(); }
 }
-// pmk is an alias for mk (same key format for personal months)
-const pmk = mk;
+// Personal months use the same key format as joint months
 
 // ── Seed subscriptions into personal month ──
 function seedPersonalMonth(who,y,m){
@@ -2400,7 +2396,7 @@ function openPersonal(who){
 function listenPersMonth(){
   if(_persMonthUnsub){ _persMonthUnsub(); _persMonthUnsub=null; }
   if(!window._fbListen) return;
-  const k=pmk(PY,PM);
+  const k=mk(PY,PM);
   _persMonthUnsub=window._fbListen('personal_'+persWho+'/'+k, data=>{
     if(!data||!data.data) return;
     try{
@@ -2671,7 +2667,7 @@ function renderPersHist(who){
   for(let i=0;i<12;i++){
     let ym=PM-i, yy=PY;
     while(ym<0){ym+=12;yy--;}
-    months.push(pmk(yy,ym));
+    months.push(mk(yy,ym));
   }
   const keys=months.filter(k=>PDB[who]&&PDB[who][k]);
   if(!keys.length){
@@ -3057,8 +3053,8 @@ async function importJSON(input){
     showToast('Importing…');
 
     // Restore in-memory state
-    name1 = data.meta.name1 || 'Dave';
-    name2 = data.meta.name2 || 'Lindsey';
+    name1 = data.meta.name1 || 'Person 1';
+    name2 = data.meta.name2 || 'Person 2';
     RECUR = data.meta.recur || [];
     rOpen = data.meta.rOpen !== false;
     cOpen = data.meta.cOpen === true;
@@ -3137,7 +3133,7 @@ document.getElementById('nextMonth').addEventListener('click',()=>changeMonth(1)
   // Show offline cache immediately while Firebase loads
   try{
     const m=JSON.parse(localStorage.getItem('bgt_meta')||'{}');
-    name1=m.name1||'Dave'; name2=m.name2||'Lindsey';
+    name1=m.name1||'Person 1'; name2=m.name2||'Person 2';
     RECUR=m.recur||[];
     document.getElementById('name1').value=name1;
     document.getElementById('name2').value=name2;
