@@ -721,6 +721,9 @@ input[placeholder="Optional note…"]:focus {
           </div>
         </div>
         <div class="zcollapse" id="e-body">
+          <div style="padding:6px 12px;border-bottom:1px solid var(--border);">
+            <input type="text" id="e-filter" placeholder="Filter expenses…" oninput="filterExp(this.value)" style="width:100%;padding:5px 10px;border:1px solid var(--border);border-radius:6px;font-size:.8rem;font-family:'DM Sans',sans-serif;background:white;color:var(--ink);">
+          </div>
           <table class="etable">
             <thead><tr>
               <th style="width:110px">Date</th>
@@ -1496,6 +1499,8 @@ function getCarryByKey(k){
 ════════════════════════════════════════════════ */
 function render(){
   const md=getMD(Y,M);
+  // Clear expense filter
+  const ef=document.getElementById('e-filter'); if(ef) ef.value='';
   const r=calcMonth(Y,M);
   const carry=getCarry(Y,M);
   const comb=r.balance+carry;
@@ -2148,6 +2153,22 @@ function clearOv(id){
   const t=RECUR.find(r=>r.id===id);
   if(t){ for(const e of md.expenses){if(e.recurId===id){e.amount=t.amount;break;}} }
   saveMD(); render();
+}
+
+function filterExp(q){
+  const tbody=document.getElementById('e-tbody');
+  if(!tbody) return;
+  const term=q.toLowerCase().trim();
+  const rows=tbody.querySelectorAll('tr');
+  // Rows come in pairs: summary + detail
+  for(let r=0;r<rows.length;r+=2){
+    const sr=rows[r], dr=rows[r+1];
+    if(!sr) continue;
+    const text=(sr.textContent||'').toLowerCase();
+    const match=!term||text.includes(term);
+    sr.style.display=match?'':'none';
+    if(dr) dr.style.display=match?(dr.classList.contains('ec-hidden')?'none':''):'none';
+  }
 }
 
 function addExp(){
