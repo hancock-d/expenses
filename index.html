@@ -859,6 +859,9 @@ input[placeholder="Optional note…"]:focus {
         <div class="sec-hdr">
           <h2>Expenses</h2>
         </div>
+        <div style="padding:6px 12px 8px;">
+          <input type="text" id="pers-filter" placeholder="Filter all expenses…" oninput="filterAllPers(this.value)" style="width:100%;padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:.8rem;font-family:'DM Sans',sans-serif;background:white;color:var(--ink);">
+        </div>
 
         <!-- Recurring Subscriptions (purple zone, same as main) -->
         <div class="rzone">
@@ -1555,6 +1558,7 @@ function renderRecur(){
   const tbody=document.getElementById('r-tbody');
   tbody.innerHTML='';
   let cnt=0,tot=0;
+  for(const idx of _collapsedRecur){ if(idx>=RECUR.length) _collapsedRecur.delete(idx); }
   RECUR.forEach((t,i)=>{
     const sk=!!(md.skips&&md.skips[t.id]);
     const freq=t.frequency||'monthly';
@@ -1713,7 +1717,6 @@ function renderRecur(){
         </div>
       </td>
       <td><input type="text" value="${esc(t.notes||'')}" placeholder="Optional note…" onchange="updRecurImm(${i},'notes',this.value)" style="min-width:120px">
-        <div style="margin-top:6px;"><button class="rdel-btn" onclick="confirmDel(this,()=>delRecur(${i}))">Delete</button></div>
       </td>`;
     tbody.appendChild(dr);
   });
@@ -1745,6 +1748,8 @@ function renderCredits(){
   const empty=document.getElementById('c-empty');
   tbody.innerHTML='';
   let tot=0;
+  const credLen=(md.credits||[]).length;
+  for(const idx of _collapsedCred){ if(idx>=credLen) _collapsedCred.delete(idx); }
   (md.credits||[]).forEach((c,i)=>{
     tot+=parseFloat(c.amount)||0;
     const collapsed=_collapsedCred.has(i);
@@ -1790,8 +1795,7 @@ function renderCredits(){
         <option value="Other" ${c.payment==='Other'?'selected':''}>Other</option>
       </select></td>
       <td class="cnum"><input type="number" value="${c.amount||''}" placeholder="0.00" min="0" step="0.01" onchange="updCredit(${i},'amount',this.value)"></td>
-      <td><input type="text" value="${esc(c.notes||'')}" placeholder="Optional note…" onchange="updCredit(${i},'notes',this.value)" style="min-width:100px"></td>
-      <td><button class="cdel-btn" onclick="confirmDel(this,()=>delCredit(${i}))">✕</button></td>`;
+      <td><input type="text" value="${esc(c.notes||'')}" placeholder="Optional note…" onchange="updCredit(${i},'notes',this.value)" style="min-width:100px"></td>`;
     tbody.appendChild(dr);
   });
   const cnt=(md.credits||[]).length;
@@ -1807,6 +1811,8 @@ function renderExpenses(){
   const empty=document.getElementById('e-empty');
   tbody.innerHTML='';
   const oneOff=md.expenses.filter(e=>!e.recurId);
+  // Prune stale collapsed indices
+  for(const idx of _collapsedExp){ if(idx>=oneOff.length) _collapsedExp.delete(idx); }
   empty.style.display=oneOff.length===0?'block':'none';
   const oneOffTotal=oneOff.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
   const ootEl=document.getElementById('other-total-tag');
@@ -1860,8 +1866,7 @@ function renderExpenses(){
         <option value="Other" ${e.payment==='Other'?'selected':''}>Other</option>
       </select></td>
       <td class="anum"><input type="number" value="${e.amount||''}" placeholder="0.00" min="0" step="0.01" onchange="updExp(${i},'amount',this.value)"></td>
-      <td><input type="text" value="${esc(e.notes||'')}" placeholder="Optional note…" onchange="updExp(${i},'notes',this.value)" style="min-width:100px"></td>
-      <td><button class="del-btn" onclick="confirmDel(this,()=>delExp(${i}))">✕</button></td>`;
+      <td><input type="text" value="${esc(e.notes||'')}" placeholder="Optional note…" onchange="updExp(${i},'notes',this.value)" style="min-width:100px"></td>`;
     tbody.appendChild(dr);
     expIdx++;
   });
@@ -1981,12 +1986,16 @@ function scrollToLastRow(tbodyId, container){
   setTimeout(()=>{
     const tbody=document.getElementById(tbodyId);
     if(!tbody) return;
-    const last=tbody.lastElementChild;
+    // Find the last summary row (the new item) and scroll to it
+    const summaries=tbody.querySelectorAll('.rsummary-row,.ec-summary-row');
+    const last=summaries.length?summaries[summaries.length-1]:tbody.lastElementChild;
     if(last){
-      const scrollEl=container||window;
       last.scrollIntoView({behavior:'smooth',block:'center'});
+      // Flash highlight so the user sees it
+      last.style.background='rgba(107,79,187,.08)';
+      setTimeout(()=>{last.style.background='';},1500);
     }
-  },80);
+  },100);
 }
 
 // Header "+ Add" wrappers — open zone if collapsed, add item, scroll to it
@@ -2171,6 +2180,29 @@ function filterAll(q){
         const match=!term||text.includes(term);
         row.style.display=match?'':'none';
         // Also toggle the detail row
+        const next=rows[r+1];
+        if(next&&(next.classList.contains('rdetail-row')||next.classList.contains('ec-detail-row'))){
+          if(!match) next.style.display='none';
+          else next.style.display=(next.classList.contains('r-hidden')||next.classList.contains('ec-hidden'))?'none':'';
+        }
+      }
+    }
+  });
+}
+
+function filterAllPers(q){
+  const term=q.toLowerCase().trim();
+  ['ps-sub-tbody','ps-exp-tbody','ps-c-tbody'].forEach(id=>{
+    const tbody=document.getElementById(id);
+    if(!tbody) return;
+    const rows=tbody.querySelectorAll('tr');
+    for(let r=0;r<rows.length;r++){
+      const row=rows[r];
+      const isSummary=row.classList.contains('rsummary-row')||row.classList.contains('ec-summary-row');
+      if(isSummary){
+        const text=(row.textContent||'').toLowerCase();
+        const match=!term||text.includes(term);
+        row.style.display=match?'':'none';
         const next=rows[r+1];
         if(next&&(next.classList.contains('rdetail-row')||next.classList.contains('ec-detail-row'))){
           if(!match) next.style.display='none';
@@ -2453,6 +2485,8 @@ function renderPersonal(){
   const who=persWho;
   const pname=who==='1'?name1:name2;
   const color=who==='1'?'var(--p1)':'var(--p2)';
+  // Clear personal filter
+  const pf=document.getElementById('pers-filter'); if(pf) pf.value='';
 
   document.getElementById('pers-name').textContent=pname+"'s Personal Tracker";
   document.getElementById('pers-name').style.color=color;
@@ -2469,6 +2503,8 @@ function renderPersSubs(who){
   const tbody=document.getElementById('ps-sub-tbody');
   tbody.innerHTML='';
   let cnt=0, tot=0;
+  const psubLen=(PSUBS[who]||[]).length;
+  for(const idx of _collapsedPRecur){ if(idx>=psubLen) _collapsedPRecur.delete(idx); }
   (PSUBS[who]||[]).forEach((t,i)=>{
     const sk=!!(md.skips&&md.skips[t.id]);
     const seeded=md.expenses.find(e=>e.subId===t.id);
@@ -2592,7 +2628,6 @@ function renderPersSubs(who){
         </div>
       </td>
       <td><input type="text" value="${esc(t.notes||'')}" placeholder="Optional note…" onchange="updPSub('${who}',${i},'notes',this.value)" style="min-width:120px">
-        <div style="margin-top:6px;"><button class="rdel-btn" onclick="confirmDel(this,()=>delPSub('${who}',${i}))">Delete</button></div>
       </td>`;
     tbody.appendChild(tr);
   });
@@ -2614,6 +2649,7 @@ function renderPersExps(who){
   const empty=document.getElementById('ps-exp-empty');
   tbody.innerHTML='';
   const oneOff=md.expenses.filter(e=>!e.isSubSeed);
+  for(const idx of _collapsedPExp){ if(idx>=oneOff.length) _collapsedPExp.delete(idx); }
   empty.style.display=oneOff.length===0?'block':'none';
   const pecEl=document.getElementById('ps-exp-cnt');
   if(pecEl) pecEl.textContent=oneOff.length;
@@ -2658,8 +2694,7 @@ function renderPersExps(who){
         <option value="Other" ${e.payment==='Other'?'selected':''}>Other</option>
       </select></td>
       <td class="anum"><input type="number" value="${e.amount||''}" placeholder="0.00" min="0" step="0.01" onchange="updPExpAmt('${who}',${ei},this.value)"></td>
-      <td><input type="text" value="${esc(e.notes||'')}" placeholder="Optional note…" onchange="updPExp('${who}',${ei},'notes',this.value)" style="min-width:100px"></td>
-      <td><button class="del-btn" onclick="confirmDel(this,()=>delPExp('${who}',${ei}))">✕</button></td>`;
+      <td><input type="text" value="${esc(e.notes||'')}" placeholder="Optional note…" onchange="updPExp('${who}',${ei},'notes',this.value)" style="min-width:100px"></td>`;
     tbody.appendChild(dr);
     pExpIdx++;
   });
@@ -2852,6 +2887,7 @@ function renderPersCredits(who){
   const empty=document.getElementById('ps-c-empty');
   tbody.innerHTML='';
   let tot=0;
+  for(const idx of _collapsedPCred){ if(idx>=md.credits.length) _collapsedPCred.delete(idx); }
   md.credits.forEach((c,i)=>{
     tot+=parseFloat(c.amount)||0;
     const collapsed=_collapsedPCred.has(i);
@@ -2869,7 +2905,7 @@ function renderPersCredits(who){
       <span style="font-weight:500;font-size:.82rem;">${esc(c.desc||'(no description)')}</span>
       <span style="font-family:'DM Mono',monospace;font-size:.82rem;color:var(--cv);margin-left:auto;">${fmt(parseFloat(c.amount)||0)}</span>
       ${c.notes?'<span class="ec-note">'+esc(c.notes)+'</span>':''}
-      ${isAuto?'':'<button class="cdel-btn" onclick="confirmDel(this,()=>delPersCredit(\'${who}\',${i}))" style="margin-left:4px;">✕</button>'}
+      ${isAuto?'':'<button class="cdel-btn" onclick="confirmDel(this,()=>delPersCredit(\''+who+'\','+i+'))" style="margin-left:4px;">✕</button>'}
     </div></td>`;
     tbody.appendChild(sr);
 
@@ -2890,8 +2926,7 @@ function renderPersCredits(who){
         <option value="Other" ${c.payment==='Other'?'selected':''}>Other</option>
       </select></td>
       <td class="cnum"><input type="number" value="${c.amount||''}" placeholder="0.00" min="0" step="0.01" onchange="updPersCredit('${who}',${i},'amount',this.value)"></td>
-      <td><input type="text" value="${esc(c.notes||'')}" placeholder="Optional note…" onchange="updPersCredit('${who}',${i},'notes',this.value)"></td>
-      <td><button class="cdel-btn" onclick="confirmDel(this,()=>delPersCredit('${who}',${i}))">✕</button></td>`;
+      <td><input type="text" value="${esc(c.notes||'')}" placeholder="Optional note…" onchange="updPersCredit('${who}',${i},'notes',this.value)"></td>`;
     tbody.appendChild(dr);
   });
   const cnt=md.credits.length;
