@@ -778,6 +778,14 @@ input[placeholder="Optional note…"]:focus {
       <div class="auth-spinner"></div>
       <p class="auth-blurb" style="text-align:center">Signing you in…</p>
     </div>
+    <div id="auth-stage-confirm-email" class="auth-stage" style="display:none">
+      <h2 class="auth-h2">Confirm your email</h2>
+      <p class="auth-blurb">It looks like you're signing in on a different device than you requested the link from. Enter the email you used to request the link:</p>
+      <input type="email" id="auth-confirm-email" placeholder="your@email.com" autocomplete="email" inputmode="email" autocapitalize="off" spellcheck="false">
+      <button class="auth-btn" id="auth-confirm-btn" onclick="authConfirmEmailAndComplete()">Continue sign-in</button>
+      <button class="auth-btn-secondary" onclick="authCancelConfirmEmail()">Cancel</button>
+      <p class="auth-err" id="auth-confirm-err"></p>
+    </div>
   </div>
 </div>
 
@@ -1069,6 +1077,7 @@ input[placeholder="Optional note…"]:focus {
         <button onclick="persChangeMonth(-1)">&#8592;</button>
         <div id="pers-month-lbl">…</div>
         <button onclick="persChangeMonth(1)">&#8594;</button>
+        <div style="display:flex;align-items:center;gap:4px;margin-left:6px;"><div class="sync-dot" id="pers-sync-dot"></div><span class="sync-label" id="pers-sync-label">sync</span></div>
         <button onclick="closePersonal()" class="pers-main-btn" title="Return to joint tracker">⌂</button>
       </div>
     </div>
@@ -1233,7 +1242,7 @@ const CATS = ['Groceries / Household','Utilities & Bills','Dining Out','Kids / C
 const MO   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MOS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DEFAULT_PIN = '1234';
-const APP_VERSION = '2.2.1'; // 2026-05-14 — boot-flash fix, PIN state reset on auth, sign-out two-tap verify
+const APP_VERSION = '2.2.2'; // 2026-05-14 — PIN early-input fix, 3d cross-device email confirm UI, 4a personal-page sync indicator
 
 /* ════════════════════════════════════════════════
    STATE
@@ -1416,9 +1425,9 @@ function lockApp(){
 
 // Sync state
 let _syncPending = 0;
-function setSyncing(){ _syncPending++; const d=document.getElementById('sync-dot'),l=document.getElementById('sync-label'); if(d){d.className='sync-dot syncing';} if(l) l.textContent='saving…'; }
-function setSynced(){ _syncPending=Math.max(0,_syncPending-1); if(_syncPending>0) return; const d=document.getElementById('sync-dot'),l=document.getElementById('sync-label'); if(d){d.className='sync-dot';} if(l) l.textContent='synced'; }
-function setSyncError(){ const d=document.getElementById('sync-dot'),l=document.getElementById('sync-label'); if(d){d.className='sync-dot error';} if(l) l.textContent='error'; }
+function setSyncing(){ _syncPending++; ['sync-dot','pers-sync-dot'].forEach(id=>{const d=document.getElementById(id); if(d) d.className='sync-dot syncing';}); ['sync-label','pers-sync-label'].forEach(id=>{const l=document.getElementById(id); if(l) l.textContent='saving…';}); }
+function setSynced(){ _syncPending=Math.max(0,_syncPending-1); if(_syncPending>0) return; ['sync-dot','pers-sync-dot'].forEach(id=>{const d=document.getElementById(id); if(d) d.className='sync-dot';}); ['sync-label','pers-sync-label'].forEach(id=>{const l=document.getElementById(id); if(l) l.textContent='synced';}); }
+function setSyncError(){ ['sync-dot','pers-sync-dot'].forEach(id=>{const d=document.getElementById(id); if(d) d.className='sync-dot error';}); ['sync-label','pers-sync-label'].forEach(id=>{const l=document.getElementById(id); if(l) l.textContent='error';}); }
 
 // Write helpers — write to Firebase AND localStorage cache
 async function saveMeta(){
@@ -3540,15 +3549,21 @@ function _friendlyAuthError(e){
 // so the PWA needs a manual paste flow to complete sign-in in its own storage scope.
 const _isIOSPWA = (typeof navigator!=='undefined' && navigator.standalone === true);
 
+// Stash for cross-device confirm flow (3d) — when email link is opened on a device
+// without the originating email in localStorage, we need to ask the user for it.
+let _pendingAuthLink = null;
+
 function authStageInput(){
   document.getElementById('auth-stage-input').style.display='flex';
   document.getElementById('auth-stage-sent').style.display='none';
   document.getElementById('auth-stage-completing').style.display='none';
+  const cf=document.getElementById('auth-stage-confirm-email'); if(cf) cf.style.display='none';
 }
 function authStageSent(email){
   document.getElementById('auth-stage-input').style.display='none';
   document.getElementById('auth-stage-sent').style.display='flex';
   document.getElementById('auth-stage-completing').style.display='none';
+  const cf=document.getElementById('auth-stage-confirm-email'); if(cf) cf.style.display='none';
   document.getElementById('auth-sent-email').textContent=email;
   // Reveal paste-link section + PWA warning only when running as an iOS standalone PWA.
   // Hide the non-PWA hint in that case (it tells users to tap the link, which would break the flow).
@@ -3563,6 +3578,17 @@ function authStageCompleting(){
   document.getElementById('auth-stage-input').style.display='none';
   document.getElementById('auth-stage-sent').style.display='none';
   document.getElementById('auth-stage-completing').style.display='flex';
+  const cf=document.getElementById('auth-stage-confirm-email'); if(cf) cf.style.display='none';
+}
+function authStageConfirmEmail(){
+  document.getElementById('auth-stage-input').style.display='none';
+  document.getElementById('auth-stage-sent').style.display='none';
+  document.getElementById('auth-stage-completing').style.display='none';
+  const cf=document.getElementById('auth-stage-confirm-email');
+  if(cf) cf.style.display='flex';
+  const errEl=document.getElementById('auth-confirm-err'); if(errEl) errEl.textContent='';
+  const inp=document.getElementById('auth-confirm-email');
+  if(inp){ inp.value=''; setTimeout(()=>{ try{ inp.focus(); }catch(e){} }, 50); }
 }
 function authResetToInput(){
   try{ localStorage.removeItem('bgt_auth_email'); }catch(e){}
@@ -3570,7 +3596,49 @@ function authResetToInput(){
   // Clear paste textarea if present
   const pl=document.getElementById('auth-paste-link');
   if(pl) pl.value='';
+  _pendingAuthLink = null;
   authStageInput();
+}
+function authCancelConfirmEmail(){
+  _pendingAuthLink = null;
+  // Clean URL so the cancelled link doesn't auto-retry on refresh
+  if(history.replaceState){
+    history.replaceState({}, document.title, window.location.origin+window.location.pathname);
+  }
+  authStageInput();
+}
+
+async function authConfirmEmailAndComplete(){
+  const errEl = document.getElementById('auth-confirm-err');
+  if(errEl) errEl.textContent = '';
+  const emailEl = document.getElementById('auth-confirm-email');
+  const email = (emailEl.value||'').trim().toLowerCase();
+  if(!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+    if(errEl) errEl.textContent = 'Enter a valid email address.';
+    return;
+  }
+  if(!_pendingAuthLink){
+    if(errEl) errEl.textContent = 'Sign-in link expired. Please request a new one.';
+    return;
+  }
+  const btn = document.getElementById('auth-confirm-btn');
+  if(btn){ btn.disabled = true; btn.textContent = 'Signing in…'; }
+  try{
+    authStageCompleting();
+    await window._authComplete(email, _pendingAuthLink);
+    try{ localStorage.removeItem('bgt_auth_email'); }catch(e){}
+    if(history.replaceState){
+      history.replaceState({}, document.title, window.location.origin+window.location.pathname);
+    }
+    _pendingAuthLink = null;
+    // _authOnState fires next and routes to family/PIN/app
+  }catch(e){
+    console.error('Confirm-email complete failed:', e);
+    authStageConfirmEmail();
+    if(errEl) errEl.textContent = _friendlyAuthError(e);
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = 'Continue sign-in'; }
+  }
 }
 
 async function authCompleteFromPaste(){
@@ -3631,19 +3699,16 @@ async function authSendLink(){
 
 async function authCompleteFromUrl(){
   if(!window._authIsLink||!window._authIsLink(window.location.href)) return false;
-  authStageCompleting();
   let email=null;
   try{ email=localStorage.getItem('bgt_auth_email'); }catch(e){}
   if(!email){
-    // Different device — prompt
-    email=prompt('Confirm your email to complete sign-in:');
-    if(!email){
-      authShowError('Sign-in cancelled.');
-      authStageInput();
-      return false;
-    }
-    email=email.trim().toLowerCase();
+    // Different device — stash the link, hand off to confirm-email stage (3d).
+    // No prompt() — proper in-screen UI instead.
+    _pendingAuthLink = window.location.href;
+    authStageConfirmEmail();
+    return false;
   }
+  authStageCompleting();
   try{
     await window._authComplete(email, window.location.href);
     try{ localStorage.removeItem('bgt_auth_email'); }catch(e){}
@@ -3747,6 +3812,8 @@ async function signOutClick(){
   name1='Person 1'; name2='Person 2';
   rOpen=true; cOpen=false; eOpen=true;
   persSubOpen={'1':true,'2':true};
+  // Reset PIN state so the next sign-in lands cleanly on unlock mode
+  pinMode='unlock'; pinEntry=''; pinNewFirst='';
   // Sign out from Firebase
   try{ if(window._authSignOut) await window._authSignOut(); }catch(e){ console.warn('Sign-out:', e); }
   // Reset UI
@@ -3782,21 +3849,23 @@ async function startDataLoad(){
 }
 
 async function proceedToApp(){
-  // Reset PIN state for this auth session. Without this, if pinMode was left in 'set-new' or
-  // 'confirm-new' from an incomplete previous change-PIN attempt (or stale PWA suspension state),
-  // the user's first 4 taps after sign-in would try to set a new PIN instead of unlocking.
-  pinMode = 'unlock';
-  pinEntry = '';
-  pinNewFirst = '';
-  const subtitle = document.getElementById('pin-subtitle');
-  if(subtitle) subtitle.textContent = 'Enter your PIN to continue';
-  const hint = document.getElementById('pin-change-hint');
-  if(hint){ hint.style.display = 'none'; hint.textContent = ''; }
-  const cb = document.getElementById('pin-change-btn');
-  if(cb) cb.textContent = 'Change PIN';
-  const errEl = document.getElementById('pin-err');
-  if(errEl) errEl.textContent = '';
-  updateDots(false);
+  // Reset PIN state ONLY if it's in a non-unlock mode (stale from a previous incomplete
+  // change-PIN attempt). On fresh page load pinMode is already 'unlock' so we skip the reset
+  // and preserve any keys the user has already tapped while the screen was loading.
+  if(pinMode !== 'unlock'){
+    pinMode = 'unlock';
+    pinEntry = '';
+    pinNewFirst = '';
+    const subtitle = document.getElementById('pin-subtitle');
+    if(subtitle) subtitle.textContent = 'Enter your PIN to continue';
+    const hint = document.getElementById('pin-change-hint');
+    if(hint){ hint.style.display = 'none'; hint.textContent = ''; }
+    const cb = document.getElementById('pin-change-btn');
+    if(cb) cb.textContent = 'Change PIN';
+    const errEl = document.getElementById('pin-err');
+    if(errEl) errEl.textContent = '';
+    updateDots(false);
+  }
 
   // _familyId is set. Kick off data loads, but DON'T await before showing PIN.
   // 3g: silent token refresh — fire-and-forget; signals iOS that storage is active,
