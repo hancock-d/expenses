@@ -215,6 +215,13 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 }
 .auth-card textarea:focus{border-color:#C49A6C;}
 .auth-card textarea::placeholder{color:rgba(255,255,255,.3);font-family:'DM Sans',sans-serif;}
+.auth-pwa-warning{
+  background:rgba(255,193,7,.12);border:1px solid rgba(255,193,7,.4);
+  border-radius:8px;padding:10px 12px;font-size:.82rem;line-height:1.5;
+  color:rgba(255,255,255,.92);
+}
+.auth-pwa-warning strong{color:#ffc107;display:block;margin-bottom:4px;}
+.auth-pwa-warning em{color:rgba(255,255,255,.95);font-style:normal;font-weight:600;}
 .auth-btn{
   background:#C49A6C;color:var(--ink);border:none;border-radius:8px;padding:12px;
   font-family:'DM Sans',sans-serif;font-size:.9rem;font-weight:600;cursor:pointer;
@@ -755,9 +762,13 @@ input[placeholder="Optional note…"]:focus {
     <div id="auth-stage-sent" class="auth-stage" style="display:none">
       <div class="auth-check">✉</div>
       <h2 class="auth-h2">Check your inbox</h2>
-      <p class="auth-blurb">We sent a sign-in link to <strong id="auth-sent-email"></strong>. Open it on this device to continue.</p>
+      <p class="auth-blurb">We sent a sign-in link to <strong id="auth-sent-email"></strong>.</p>
+      <div id="auth-pwa-warning" class="auth-pwa-warning" style="display:none;">
+        <strong>⚠ Don't tap the link in the email.</strong> iOS opens it in Safari instead of this app, and the link only works once. Long-press the link in Mail → tap <em>Copy Link</em> → paste it below.
+      </div>
+      <p class="auth-blurb" id="auth-non-pwa-hint">Open the email on this device and tap the link to continue.</p>
       <div id="auth-paste-section" style="display:none;flex-direction:column;gap:10px;margin-top:6px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1);">
-        <p class="auth-blurb" style="margin:0;">Using the home-screen app? Copy the link from the email (long-press → Copy Link) and paste it here:</p>
+        <p class="auth-blurb" style="margin:0;font-weight:600;">Paste the link from your email:</p>
         <textarea id="auth-paste-link" placeholder="Paste sign-in link…" rows="3" autocapitalize="off" spellcheck="false"></textarea>
         <button class="auth-btn" onclick="authCompleteFromPaste()">Sign in with this link</button>
       </div>
@@ -1208,7 +1219,7 @@ const CATS = ['Groceries / Household','Utilities & Bills','Dining Out','Kids / C
 const MO   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MOS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DEFAULT_PIN = '1234';
-const APP_VERSION = '2.1.0'; // 2026-05-14 — family invites + member management (Session 3c)
+const APP_VERSION = '2.2.0'; // 2026-05-14 — polish bundle: default-collapsed (3f), silent token refresh (3g), auth completion UX (3h), PWA pre-warning (3i)
 
 /* ════════════════════════════════════════════════
    STATE
@@ -1241,16 +1252,32 @@ let _collapsedCred=new Set();
 let _collapsedPRecur=new Set();
 let _collapsedPExp=new Set();
 let _collapsedPCred=new Set();
-// Restore from localStorage
-try{
-  const cs=JSON.parse(localStorage.getItem('bgt_collapsed')||'{}');
-  if(cs.r) _collapsedRecur=new Set(cs.r);
-  if(cs.e) _collapsedExp=new Set(cs.e);
-  if(cs.c) _collapsedCred=new Set(cs.c);
-  if(cs.pr) _collapsedPRecur=new Set(cs.pr);
-  if(cs.pe) _collapsedPExp=new Set(cs.pe);
-  if(cs.pc) _collapsedPCred=new Set(cs.pc);
-}catch(e){}
+// 3f: Always start with all rows collapsed on fresh boot. Within-session toggles still
+// persist to localStorage (so switching months and coming back preserves state), but
+// the saved state is intentionally ignored on next app open via collapseAllForCurrentData().
+function collapseAllForCurrentData(){
+  _collapsedRecur.clear(); _collapsedExp.clear(); _collapsedCred.clear();
+  _collapsedPRecur.clear(); _collapsedPExp.clear(); _collapsedPCred.clear();
+  // Joint recurring templates
+  for(let i=0;i<RECUR.length;i++) _collapsedRecur.add(i);
+  // Joint expenses + credits for current month
+  const jk = mk(Y,M);
+  const jmd = DB[jk];
+  if(jmd){
+    const credLen = (jmd.credits||[]).length;
+    for(let i=0;i<credLen;i++) _collapsedCred.add(i);
+    // expenses: skip seeded recurring; only count non-recurring (matches render-time logic)
+    const oneOff = (jmd.expenses||[]).filter(e => !e.recurId && !e.recurParent);
+    for(let i=0;i<oneOff.length;i++) _collapsedExp.add(i);
+  }
+  // Personal: collapse both pages' subs + current month expenses/credits.
+  // PRecur/PExp/PCred sets are shared across the two personal pages (only one open at a time).
+  // Use the larger set of indices so neither page has expanded rows when first opened.
+  const maxPsubs = Math.max((PSUBS['1']||[]).length, (PSUBS['2']||[]).length);
+  for(let i=0;i<maxPsubs;i++) _collapsedPRecur.add(i);
+  // Don't pre-populate personal expenses/credits since they're per-user-per-month and
+  // we don't know which page will open first. Will populate lazily on first personal-page render.
+}
 function _saveCollapsed(){
   try{localStorage.setItem('bgt_collapsed',JSON.stringify({
     r:[..._collapsedRecur],e:[..._collapsedExp],c:[..._collapsedCred],
@@ -1290,13 +1317,19 @@ function updateDots(err){
     dot.classList.toggle('error',err);
   }
 }
-function checkPin(){
+async function checkPin(){
   const stored=getStoredPin();
   if(pinMode==='unlock'){
     if(pinEntry===stored){
+      sessionStorage.setItem('bgt_unlocked','1');
+      // 3h: if data is still loading from boot, show a brief loading hint on the PIN screen
+      // instead of swapping to a half-rendered app
+      if(_dataLoadPromise && !_dataLoaded){
+        document.getElementById('pin-subtitle').textContent='Loading your budget…';
+        try{ await _dataLoadPromise; }catch(e){ console.warn('Data load failed:', e); }
+      }
       document.getElementById('pin-screen').classList.remove('show');
       document.getElementById('app').classList.add('unlocked');
-      sessionStorage.setItem('bgt_unlocked','1');
     } else {
       shakeError('Incorrect PIN');
     }
@@ -2709,6 +2742,19 @@ function openPersonal(who){
   persWho=String(who);
   const n=new Date(); PY=n.getFullYear(); PM=n.getMonth();
   seedPersonalMonth(persWho,PY,PM);
+  // 3f: Collapse all personal-page rows on each open for scannability.
+  // Within-session toggles still persist; this just resets default on open.
+  _collapsedPRecur.clear(); _collapsedPExp.clear(); _collapsedPCred.clear();
+  const psubs = PSUBS[persWho] || [];
+  for(let i=0;i<psubs.length;i++) _collapsedPRecur.add(i);
+  const pk = mk(PY,PM);
+  const pmd = PDB[persWho] && PDB[persWho][pk];
+  if(pmd){
+    const credLen = (pmd.credits||[]).length;
+    for(let i=0;i<credLen;i++) _collapsedPCred.add(i);
+    const oneOff = (pmd.expenses||[]).filter(e => !e.recurId && !e.recurParent);
+    for(let i=0;i<oneOff.length;i++) _collapsedPExp.add(i);
+  }
   document.getElementById('pers-overlay').classList.add('open');
   renderPersonal();
   listenPersMonth();
@@ -3490,9 +3536,14 @@ function authStageSent(email){
   document.getElementById('auth-stage-sent').style.display='flex';
   document.getElementById('auth-stage-completing').style.display='none';
   document.getElementById('auth-sent-email').textContent=email;
-  // Reveal paste-link section only when running as an iOS standalone PWA
+  // Reveal paste-link section + PWA warning only when running as an iOS standalone PWA.
+  // Hide the non-PWA hint in that case (it tells users to tap the link, which would break the flow).
   const ps=document.getElementById('auth-paste-section');
-  if(ps) ps.style.display = _isIOSPWA ? 'flex' : 'none';
+  const warn=document.getElementById('auth-pwa-warning');
+  const hint=document.getElementById('auth-non-pwa-hint');
+  if(ps)   ps.style.display   = _isIOSPWA ? 'flex' : 'none';
+  if(warn) warn.style.display = _isIOSPWA ? 'block' : 'none';
+  if(hint) hint.style.display = _isIOSPWA ? 'none' : 'block';
 }
 function authStageCompleting(){
   document.getElementById('auth-stage-input').style.display='none';
@@ -3695,20 +3746,46 @@ async function signOutClick(){
   showScreen('auth');
 }
 
+// 3h: split data loading from screen-show so PIN screen appears immediately after auth+family
+// resolve. Data loads run in parallel and the in-progress promise is awaited if the user enters
+// their PIN before loads complete. Also collapse-all on first paint.
+let _dataLoaded = false;
+let _dataLoadPromise = null;
+
+async function startDataLoad(){
+  _dataLoaded = false;
+  _dataLoadPromise = (async () => {
+    await loadAll();
+    await loadPersonal();
+    getMD(Y,M); seedMonth(Y,M);
+    // 3f: collapse all rows on first paint so the app opens scannable.
+    collapseAllForCurrentData();
+    render();
+    startListeners();
+    _dataLoaded = true;
+  })();
+  return _dataLoadPromise;
+}
+
 async function proceedToApp(){
-  // _familyId is set. Load data, then show PIN (or skip to app if session unlocked).
-  await loadAll();
-  await loadPersonal();
-  getMD(Y,M); seedMonth(Y,M);
-  render();
-  startListeners();
-  // Update account email in data-tools section
+  // _familyId is set. Kick off data loads, but DON'T await before showing PIN.
+  // 3g: silent token refresh — fire-and-forget; signals iOS that storage is active,
+  // and surfaces revoked tokens early (onAuthStateChanged will fire with null on revocation).
+  if(_currentUser && typeof _currentUser.getIdToken === 'function'){
+    _currentUser.getIdToken(true).catch(e => console.warn('Token refresh failed:', e.code, e.message));
+  }
+  startDataLoad();
+  // Update account email
   const ae=document.getElementById('account-email');
   if(ae && _currentUser) ae.textContent=_currentUser.email||_currentUser.uid;
   // PIN gate (session-scoped bypass)
   if(sessionStorage.getItem('bgt_unlocked')==='1'){
+    // Already unlocked — wait for data, then show app
+    await _dataLoadPromise;
     showScreen('app');
   } else {
+    // Show PIN immediately; data continues loading in background.
+    // PIN-correct path awaits _dataLoadPromise before swapping to app.
     showScreen('pin');
   }
 }
