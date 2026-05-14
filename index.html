@@ -166,6 +166,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 }
 .auth-card input[type=email]:focus{border-color:#C49A6C;}
 .auth-card input[type=email]::placeholder{color:rgba(255,255,255,.3);}
+.auth-card textarea{
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);
+  border-radius:8px;padding:10px 12px;color:white;font-family:'DM Mono',monospace;
+  font-size:14px;outline:none;resize:vertical;min-height:70px;width:100%;
+  box-sizing:border-box;word-break:break-all;
+}
+.auth-card textarea:focus{border-color:#C49A6C;}
+.auth-card textarea::placeholder{color:rgba(255,255,255,.3);font-family:'DM Sans',sans-serif;}
 .auth-btn{
   background:#C49A6C;color:var(--ink);border:none;border-radius:8px;padding:12px;
   font-family:'DM Sans',sans-serif;font-size:.9rem;font-weight:600;cursor:pointer;
@@ -678,6 +686,11 @@ input[placeholder="Optional note…"]:focus {
       <div class="auth-check">✉</div>
       <h2 class="auth-h2">Check your inbox</h2>
       <p class="auth-blurb">We sent a sign-in link to <strong id="auth-sent-email"></strong>. Open it on this device to continue.</p>
+      <div id="auth-paste-section" style="display:none;flex-direction:column;gap:10px;margin-top:6px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1);">
+        <p class="auth-blurb" style="margin:0;">Using the home-screen app? Copy the link from the email (long-press → Copy Link) and paste it here:</p>
+        <textarea id="auth-paste-link" placeholder="Paste sign-in link…" rows="3" autocapitalize="off" spellcheck="false"></textarea>
+        <button class="auth-btn" onclick="authCompleteFromPaste()">Sign in with this link</button>
+      </div>
       <button class="auth-btn-secondary" onclick="authResetToInput()">Use a different email</button>
     </div>
     <div id="auth-stage-completing" class="auth-stage" style="display:none">
@@ -1112,7 +1125,7 @@ const CATS = ['Groceries / Household','Utilities & Bills','Dining Out','Kids / C
 const MO   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MOS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DEFAULT_PIN = '1234';
-const APP_VERSION = '2.0.0'; // 2026-05 — auth (email link) + multi-tenant family data model
+const APP_VERSION = '2.0.1'; // 2026-05-14 — iOS PWA paste-link sign-in flow (Session 3e)
 
 /* ════════════════════════════════════════════════
    STATE
@@ -3365,6 +3378,11 @@ function _friendlyAuthError(e){
   return (e&&e.message)||'Something went wrong. Try again.';
 }
 
+// iOS standalone PWA detection — used to show paste-link affordance.
+// Email-link auth can't reach a PWA on iOS (iOS routes external URLs to Safari only),
+// so the PWA needs a manual paste flow to complete sign-in in its own storage scope.
+const _isIOSPWA = (typeof navigator!=='undefined' && navigator.standalone === true);
+
 function authStageInput(){
   document.getElementById('auth-stage-input').style.display='flex';
   document.getElementById('auth-stage-sent').style.display='none';
@@ -3375,6 +3393,9 @@ function authStageSent(email){
   document.getElementById('auth-stage-sent').style.display='flex';
   document.getElementById('auth-stage-completing').style.display='none';
   document.getElementById('auth-sent-email').textContent=email;
+  // Reveal paste-link section only when running as an iOS standalone PWA
+  const ps=document.getElementById('auth-paste-section');
+  if(ps) ps.style.display = _isIOSPWA ? 'flex' : 'none';
 }
 function authStageCompleting(){
   document.getElementById('auth-stage-input').style.display='none';
@@ -3384,7 +3405,41 @@ function authStageCompleting(){
 function authResetToInput(){
   try{ localStorage.removeItem('bgt_auth_email'); }catch(e){}
   authShowError('');
+  // Clear paste textarea if present
+  const pl=document.getElementById('auth-paste-link');
+  if(pl) pl.value='';
   authStageInput();
+}
+
+async function authCompleteFromPaste(){
+  authShowError('');
+  const linkEl=document.getElementById('auth-paste-link');
+  const link=(linkEl.value||'').trim();
+  if(!link){
+    authShowError('Paste the sign-in link first');
+    return;
+  }
+  if(!window._authIsLink || !window._authIsLink(link)){
+    authShowError("That doesn't look like a valid sign-in link. Make sure you copied the full URL from the email.");
+    return;
+  }
+  let email=null;
+  try{ email=localStorage.getItem('bgt_auth_email'); }catch(e){}
+  if(!email){
+    authShowError('Email not found in this app — tap "Use a different email" and resend the link.');
+    return;
+  }
+  authStageCompleting();
+  try{
+    await window._authComplete(email, link);
+    try{ localStorage.removeItem('bgt_auth_email'); }catch(e){}
+    // No URL to clean — paste flow doesn't put params in window.location
+    // _authOnState fires next and routes to family/PIN/app
+  }catch(e){
+    console.error('Paste complete failed:', e);
+    authShowError(_friendlyAuthError(e));
+    authStageSent(email); // back to sent stage so user can retry
+  }
 }
 
 async function authSendLink(){
