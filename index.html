@@ -18,7 +18,8 @@
 <!-- Firebase SDK -->
 <script type="module" id="fb-init">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc, onSnapshot }
+import { getFirestore, doc, getDoc, setDoc, deleteDoc, onSnapshot,
+         collection, collectionGroup, query, where, getDocs }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import {
   getAuth, sendSignInLinkToEmail, signInWithEmailLink, isSignInWithEmailLink,
@@ -76,6 +77,46 @@ window._fbListen = (path, cb) => {
     snap => cb(snap.exists() ? snap.data() : null),
     err => console.error('FB listener error:', path, err.code, err.message)
   );
+};
+
+window._fbDelete = async (path) => {
+  try {
+    await deleteDoc(dbDoc(path));
+    return true;
+  } catch(e) {
+    console.error('FB delete failed:', path, e.code, e.message);
+    return false;
+  }
+};
+
+// Listen to a collection (path must have odd segments). Callback receives array of {id, ...data}.
+window._fbListenCollection = (path, cb) => {
+  const parts = path.split('/');
+  const col = collection(db, parts[0], ...parts.slice(1));
+  return onSnapshot(
+    col,
+    snap => {
+      const docs = [];
+      snap.forEach(d => docs.push({id: d.id, ...d.data()}));
+      cb(docs);
+    },
+    err => console.error('FB collection listener error:', path, err.code, err.message)
+  );
+};
+
+// CollectionGroup query: find all docs in any collection named `collectionId` where `field == value`.
+// Returns array of {id, path, ...data}. Used for pending-invite lookup by email.
+window._fbQueryGroup = async (collectionId, field, value) => {
+  try {
+    const q = query(collectionGroup(db, collectionId), where(field, '==', value));
+    const snap = await getDocs(q);
+    const out = [];
+    snap.forEach(d => out.push({id: d.id, path: d.ref.path, ...d.data()}));
+    return out;
+  } catch(e) {
+    console.error('FB collectionGroup query failed:', collectionId, field, value, e.code, e.message);
+    return [];
+  }
 };
 
 // Auth helpers exposed to non-module script
@@ -207,6 +248,35 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 .dt-account-email{font-size:.78rem;color:var(--ink);font-family:'DM Mono',monospace;word-break:break-all;}
 .dt-signout{background:transparent;color:var(--rust);border-color:var(--rust);}
 .dt-signout:hover{background:var(--rust);color:white;border-color:var(--rust);}
+
+/* Family management section */
+.dt-family{margin-top:14px;padding-top:14px;border-top:1px solid var(--lg);display:flex;flex-direction:column;gap:10px;}
+.dt-family-label{font-size:.62rem;color:var(--slate);text-transform:uppercase;letter-spacing:.08em;font-weight:700;}
+.fam-members{display:flex;flex-direction:column;gap:6px;}
+.fam-member{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;background:rgba(94,53,177,.05);border:1px solid var(--lg);border-radius:8px;flex-wrap:wrap;}
+.fam-member-info{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1 1 auto;}
+.fam-member-email{font-size:.78rem;color:var(--ink);font-family:'DM Mono',monospace;word-break:break-all;}
+.fam-member-role{font-size:.62rem;color:var(--slate);text-transform:uppercase;letter-spacing:.08em;font-weight:700;}
+.fam-member-role.owner{color:#5e35b1;}
+.fam-member.is-you{background:rgba(94,53,177,.1);border-color:#5e35b1;}
+.fam-member-action{background:transparent;color:var(--rust);border:1px solid var(--rust);border-radius:6px;padding:4px 10px;font-family:'DM Sans',sans-serif;font-size:.7rem;cursor:pointer;touch-action:manipulation;}
+.fam-member-action:hover{background:var(--rust);color:white;}
+.fam-invite-row{display:flex;gap:8px;align-items:stretch;flex-wrap:wrap;}
+.fam-invite-row input{flex:1 1 200px;min-width:0;background:white;border:1px solid var(--lg);border-radius:8px;padding:8px 10px;font-family:'DM Mono',monospace;font-size:16px;color:var(--ink);outline:none;}
+.fam-invite-row input:focus{border-color:#5e35b1;}
+.fam-invite-row button{background:#5e35b1;color:white;border:none;border-radius:8px;padding:8px 14px;font-family:'DM Sans',sans-serif;font-size:.78rem;font-weight:600;cursor:pointer;touch-action:manipulation;}
+.fam-invite-row button:hover{background:#7e57c2;}
+.fam-invite-row button:disabled{opacity:.5;cursor:wait;}
+.fam-invites-pending{display:flex;flex-direction:column;gap:6px;}
+.fam-pending{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px;background:rgba(255,193,7,.1);border:1px dashed rgba(255,193,7,.5);border-radius:8px;}
+.fam-pending-info{display:flex;flex-direction:column;gap:2px;min-width:0;}
+.fam-pending-email{font-size:.74rem;color:var(--ink);font-family:'DM Mono',monospace;word-break:break-all;}
+.fam-pending-meta{font-size:.62rem;color:var(--slate);}
+.fam-msg{font-size:.72rem;color:var(--slate);min-height:1em;}
+.fam-msg.err{color:var(--rust);}
+.fam-msg.ok{color:#558b2f;}
+.fam-leave{align-self:flex-start;background:transparent;color:var(--rust);border:1px solid var(--rust);border-radius:8px;padding:6px 12px;font-family:'DM Sans',sans-serif;font-size:.74rem;cursor:pointer;touch-action:manipulation;margin-top:4px;}
+.fam-leave:hover{background:var(--rust);color:white;}
 
 /* ══════════════════════════════
    APP SHELL
@@ -938,6 +1008,19 @@ input[placeholder="Optional note…"]:focus {
         <button class="dt-btn dt-import" onclick="document.getElementById('import-file').click()">⬆ Import JSON</button>
         <input type="file" id="import-file" accept=".json,application/json" style="display:none" onchange="importJSON(this)">
       </div>
+      <div class="dt-family">
+        <span class="dt-family-label">Family</span>
+        <div class="fam-members" id="fam-members"></div>
+        <div id="fam-invite-section" style="display:none;flex-direction:column;gap:6px;">
+          <div class="fam-invite-row">
+            <input type="email" id="fam-invite-email" placeholder="Invite by email…" autocomplete="off" autocapitalize="off" spellcheck="false">
+            <button id="fam-invite-btn" onclick="inviteMember()">Send invite</button>
+          </div>
+          <div class="fam-invites-pending" id="fam-pending-list"></div>
+        </div>
+        <button class="fam-leave" id="fam-leave-btn" onclick="leaveFamilyClick()" style="display:none;">Leave family</button>
+        <p class="fam-msg" id="fam-msg"></p>
+      </div>
       <div class="dt-account">
         <div class="dt-account-info">
           <span class="dt-account-label">Signed in</span>
@@ -1125,7 +1208,7 @@ const CATS = ['Groceries / Household','Utilities & Bills','Dining Out','Kids / C
 const MO   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MOS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DEFAULT_PIN = '1234';
-const APP_VERSION = '2.0.1'; // 2026-05-14 — iOS PWA paste-link sign-in flow (Session 3e)
+const APP_VERSION = '2.1.0'; // 2026-05-14 — family invites + member management (Session 3c)
 
 /* ════════════════════════════════════════════════
    STATE
@@ -1139,6 +1222,8 @@ let rOpen=true, cOpen=false, eOpen=true;
 // Auth + family state
 let _currentUser = null;    // Firebase user object (set after sign-in)
 let _familyId    = null;    // Active family ID
+let _familyMembers = [];    // [{uid, email, role, addedAt}] live from members subcollection
+let _isOwner = false;       // true if _currentUser is owner of _familyId
 try { _familyId = localStorage.getItem('bgt_family_id') || null; } catch(e) {}
 
 // All Firestore reads/writes go through paths returned by this helper.
@@ -1366,7 +1451,7 @@ async function loadAll(){
 
 // Real-time listener — updates app when other device makes changes
 let _listenersActive=false;
-let _metaUnsub=null, _persMetaUnsub=null;
+let _metaUnsub=null, _persMetaUnsub=null, _membersUnsub=null;
 function startListeners(){
   if(_listenersActive||!window._fbListen||!_familyId) return;
   _listenersActive=true;
@@ -1394,6 +1479,17 @@ function startListeners(){
     persSubOpen=data.subOpen||{'1':true,'2':true};
     localStorage.setItem('bgt_pers_meta',JSON.stringify({subs:PSUBS,subOpen:persSubOpen}));
   });
+
+  // Listen to family members (live list)
+  if(window._fbListenCollection){
+    _membersUnsub=window._fbListenCollection(_famPath('members'), members=>{
+      _familyMembers = members.map(m => ({uid:m.id, email:m.email, role:m.role||'member', addedAt:m.addedAt}));
+      _isOwner = !!_familyMembers.find(m => m.uid === (_currentUser && _currentUser.uid) && m.role === 'owner');
+      renderFamilySection();
+      // If owner, also refresh pending invites since visibility depends on ownership
+      if(_isOwner) loadPendingInvites();
+    });
+  }
 }
 
 function stopListeners(){
@@ -1401,6 +1497,7 @@ function stopListeners(){
   if(_persMetaUnsub){ _persMetaUnsub(); _persMetaUnsub=null; }
   if(_monthUnsub){ _monthUnsub(); _monthUnsub=null; }
   if(_persMonthUnsub){ _persMonthUnsub(); _persMonthUnsub=null; }
+  if(_membersUnsub){ _membersUnsub(); _membersUnsub=null; }
   _listenersActive=false;
 }
 
@@ -3561,6 +3658,7 @@ async function authCreateFamilyClick(){
 async function signOutClick(){
   // Tear down listeners first so we don't get permission-denied bursts after sign-out
   try{ stopListeners(); }catch(e){}
+  if(_invitesUnsub){ try{ _invitesUnsub(); }catch(e){} _invitesUnsub=null; }
   // Clear cached state
   try{
     localStorage.removeItem('bgt_family_id');
@@ -3576,6 +3674,9 @@ async function signOutClick(){
   // Reset in-memory state
   _familyId=null;
   _currentUser=null;
+  _familyMembers=[];
+  _pendingInvites=[];
+  _isOwner=false;
   DB={}; PDB={'1':{},'2':{}};
   RECUR=[]; PSUBS={'1':[],'2':[]};
   name1='Person 1'; name2='Person 2';
@@ -3585,6 +3686,11 @@ async function signOutClick(){
   try{ if(window._authSignOut) await window._authSignOut(); }catch(e){ console.warn('Sign-out:', e); }
   // Reset UI
   const ae=document.getElementById('account-email'); if(ae) ae.textContent='—';
+  // Clear family UI
+  const memEl=document.getElementById('fam-members'); if(memEl) memEl.innerHTML='';
+  const pendingEl=document.getElementById('fam-pending-list'); if(pendingEl) pendingEl.innerHTML='';
+  const invSec=document.getElementById('fam-invite-section'); if(invSec) invSec.style.display='none';
+  const leaveBtn=document.getElementById('fam-leave-btn'); if(leaveBtn) leaveBtn.style.display='none';
   authResetToInput();
   showScreen('auth');
 }
@@ -3612,6 +3718,8 @@ async function handleAuthState(user){
     // Signed out
     _currentUser=null;
     _familyId=null;
+    _familyMembers=[];
+    _isOwner=false;
     try{ localStorage.removeItem('bgt_family_id'); }catch(e){}
     const ae=document.getElementById('account-email'); if(ae) ae.textContent='—';
     showScreen('auth');
@@ -3629,12 +3737,213 @@ async function handleAuthState(user){
     _familyId=famId;
     try{ localStorage.setItem('bgt_family_id', famId); }catch(e){}
     await proceedToApp();
-  } else {
-    // No family yet — first-time-user flow
-    const fue=document.getElementById('family-user-email');
-    if(fue) fue.textContent=user.email||user.uid;
-    authShowError('', 'family-err');
-    showScreen('family');
+    return;
+  }
+  // No family — check for pending invites against this user's email
+  if(user.email){
+    try{
+      const accepted = await acceptPendingInviteIfAny(user.uid, user.email);
+      if(accepted){
+        _familyId = accepted;
+        try{ localStorage.setItem('bgt_family_id', accepted); }catch(e){}
+        await proceedToApp();
+        return;
+      }
+    }catch(e){ console.warn('Pending invite check failed:', e); }
+  }
+  // Still no family — first-time-user flow
+  const fue=document.getElementById('family-user-email');
+  if(fue) fue.textContent=user.email||user.uid;
+  authShowError('', 'family-err');
+  showScreen('family');
+}
+
+/* ════════════════════════════════════════════════
+   FAMILY MEMBERS + INVITES (Session 3c)
+════════════════════════════════════════════════ */
+
+// Called from handleAuthState. Looks for a pending invite matching this user's email
+// across all families. If found, joins the family and deletes the invite.
+async function acceptPendingInviteIfAny(uid, email){
+  if(!window._fbQueryGroup) return null;
+  const lc = email.toLowerCase();
+  // Pending invites are stored at families/{fid}/pendingInvites/{email-lowercased}
+  // with `email` field also denormalized for queryability.
+  const invites = await window._fbQueryGroup('pendingInvites', 'email', lc);
+  if(!invites || invites.length === 0) return null;
+  // Pick the first one (in practice should only ever be one — invitations are exclusive per email)
+  const invite = invites[0];
+  // Path looks like: families/{fid}/pendingInvites/{email}
+  const parts = invite.path.split('/');
+  if(parts.length !== 4 || parts[0] !== 'families' || parts[2] !== 'pendingInvites') return null;
+  const fid = parts[1];
+  // 1) Create self-membership doc (rules allow because request.auth.uid == uid)
+  const memOk = await window._fbSet('families/'+fid+'/members/'+uid, {
+    email: email, role: 'member', addedAt: Date.now()
+  });
+  if(!memOk) return null;
+  // 2) Create userFamilies routing doc
+  const routeOk = await window._fbSet('userFamilies/'+uid, {
+    familyId: fid, createdAt: Date.now()
+  });
+  if(!routeOk) return null;
+  // 3) Delete the pending invite (rules allow because we're now a member)
+  try{ await window._fbDelete(invite.path); }catch(e){ console.warn('Delete invite failed:', e); }
+  return fid;
+}
+
+async function loadPendingInvites(){
+  if(!_familyId || !_isOwner) return;
+  // Direct subcollection listen via collection helper
+  if(!window._fbListenCollection) return;
+  if(_invitesUnsub) return; // already listening
+  _invitesUnsub = window._fbListenCollection(_famPath('pendingInvites'), invites=>{
+    _pendingInvites = invites;
+    renderFamilySection();
+  });
+}
+
+let _pendingInvites = [];
+let _invitesUnsub = null;
+
+function renderFamilySection(){
+  const memEl = document.getElementById('fam-members');
+  const inviteSection = document.getElementById('fam-invite-section');
+  const leaveBtn = document.getElementById('fam-leave-btn');
+  const pendingEl = document.getElementById('fam-pending-list');
+  if(!memEl) return;
+  // Sort: owner first, then by addedAt
+  const sorted = [..._familyMembers].sort((a,b)=>{
+    if(a.role==='owner' && b.role!=='owner') return -1;
+    if(b.role==='owner' && a.role!=='owner') return 1;
+    return (a.addedAt||0)-(b.addedAt||0);
+  });
+  const myUid = _currentUser && _currentUser.uid;
+  memEl.innerHTML = sorted.map(m => {
+    const isYou = m.uid === myUid;
+    const canRemove = _isOwner && !isYou; // owner can remove others, not self
+    return `<div class="fam-member ${isYou?'is-you':''}">
+      <div class="fam-member-info">
+        <span class="fam-member-email">${esc(m.email||'(unknown)')}${isYou?' (you)':''}</span>
+        <span class="fam-member-role ${m.role==='owner'?'owner':''}">${esc(m.role||'member')}</span>
+      </div>
+      ${canRemove?`<button class="fam-member-action" onclick="confirmDel(this,()=>removeMember('${esc(m.uid)}','${esc(m.email||'')}'))">Remove</button>`:''}
+    </div>`;
+  }).join('');
+  // Invite section + pending list — owner only
+  if(inviteSection) inviteSection.style.display = _isOwner ? 'flex' : 'none';
+  // Leave button — non-owner only (owner can't leave their own family without transferring; out of scope here)
+  if(leaveBtn) leaveBtn.style.display = (_familyMembers.length > 0 && !_isOwner) ? 'inline-block' : 'none';
+  // Pending invites
+  if(pendingEl){
+    if(_pendingInvites.length === 0){
+      pendingEl.innerHTML = '';
+    } else {
+      pendingEl.innerHTML = _pendingInvites.map(inv => {
+        const when = inv.invitedAt ? new Date(inv.invitedAt).toLocaleDateString() : '';
+        return `<div class="fam-pending">
+          <div class="fam-pending-info">
+            <span class="fam-pending-email">${esc(inv.email||inv.id||'')}</span>
+            <span class="fam-pending-meta">Pending${when?' · sent '+when:''}</span>
+          </div>
+          <button class="fam-member-action" onclick="confirmDel(this,()=>revokeInvite('${esc(inv.id)}'))">Revoke</button>
+        </div>`;
+      }).join('');
+    }
+  }
+}
+
+function _famSetMsg(text, kind){
+  const el = document.getElementById('fam-msg');
+  if(!el) return;
+  el.textContent = text || '';
+  el.classList.remove('err','ok');
+  if(kind) el.classList.add(kind);
+  if(text) setTimeout(()=>{ if(el.textContent===text){ el.textContent=''; el.classList.remove('err','ok'); } }, 4000);
+}
+
+async function inviteMember(){
+  _famSetMsg('');
+  if(!_isOwner){ _famSetMsg('Only the family owner can invite people.', 'err'); return; }
+  const input = document.getElementById('fam-invite-email');
+  const btn = document.getElementById('fam-invite-btn');
+  const email = (input.value||'').trim().toLowerCase();
+  if(!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+    _famSetMsg('Enter a valid email address.', 'err'); return;
+  }
+  if(email === (_currentUser && _currentUser.email || '').toLowerCase()){
+    _famSetMsg("That's your own email.", 'err'); return;
+  }
+  if(_familyMembers.find(m => (m.email||'').toLowerCase() === email)){
+    _famSetMsg('That person is already in this family.', 'err'); return;
+  }
+  btn.disabled = true; btn.textContent = 'Sending…';
+  try{
+    // Doc ID = email so duplicate invites overwrite. Email field denormalized for collectionGroup query.
+    const ok = await window._fbSet(_famPath('pendingInvites/'+email), {
+      email: email,
+      familyId: _familyId,
+      invitedBy: _currentUser.uid,
+      invitedByEmail: _currentUser.email || null,
+      invitedAt: Date.now()
+    });
+    if(!ok){ _famSetMsg('Could not create invite. Check Firestore rules.', 'err'); return; }
+    input.value = '';
+    _famSetMsg('Invite ready. Tell them to sign in with this email and they\'ll be auto-joined.', 'ok');
+  } catch(e){
+    console.error('Invite failed:', e);
+    _famSetMsg(e.message || 'Invite failed.', 'err');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Send invite';
+  }
+}
+
+async function revokeInvite(emailId){
+  _famSetMsg('');
+  if(!_isOwner){ _famSetMsg('Only the family owner can revoke invites.', 'err'); return; }
+  try{
+    const ok = await window._fbDelete(_famPath('pendingInvites/'+emailId));
+    if(!ok){ _famSetMsg('Could not revoke invite.', 'err'); return; }
+    _famSetMsg('Invite revoked.', 'ok');
+  }catch(e){
+    console.error('Revoke failed:', e);
+    _famSetMsg(e.message || 'Revoke failed.', 'err');
+  }
+}
+
+async function removeMember(uid, email){
+  _famSetMsg('');
+  if(!_isOwner){ _famSetMsg('Only the family owner can remove members.', 'err'); return; }
+  if(uid === _currentUser.uid){ _famSetMsg("You can't remove yourself.", 'err'); return; }
+  try{
+    // Remove member doc + their userFamilies routing doc
+    const memOk = await window._fbDelete('families/'+_familyId+'/members/'+uid);
+    if(!memOk){ _famSetMsg('Could not remove member from family.', 'err'); return; }
+    // Best-effort: clear their userFamilies. Rules may deny if they're not the caller — that's OK,
+    // when they next sign in they'll see no family + no pending invite, treated as new user.
+    try{ await window._fbDelete('userFamilies/'+uid); }catch(e){}
+    _famSetMsg(email + ' removed from family.', 'ok');
+  }catch(e){
+    console.error('Remove member failed:', e);
+    _famSetMsg(e.message || 'Remove failed.', 'err');
+  }
+}
+
+async function leaveFamilyClick(){
+  _famSetMsg('');
+  if(_isOwner){ _famSetMsg("Owners can't leave. Transfer ownership first (not yet implemented).", 'err'); return; }
+  if(!confirm('Leave this family? Your access to all shared data will be removed. This cannot be undone from within the app.')) return;
+  try{
+    // Remove our own member doc
+    const memOk = await window._fbDelete('families/'+_familyId+'/members/'+_currentUser.uid);
+    if(!memOk){ _famSetMsg('Could not leave family.', 'err'); return; }
+    // Remove our userFamilies routing doc
+    try{ await window._fbDelete('userFamilies/'+_currentUser.uid); }catch(e){}
+    // Sign out (clean teardown)
+    await signOutClick();
+  }catch(e){
+    console.error('Leave family failed:', e);
+    _famSetMsg(e.message || 'Leave failed.', 'err');
   }
 }
 
