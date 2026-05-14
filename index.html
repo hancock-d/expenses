@@ -179,6 +179,23 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 .pin-change-btn{font-size:.75rem;color:rgba(255,255,255,.35);background:none;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;text-decoration:underline;padding:4px 8px;}
 .pin-change-btn:hover{color:rgba(255,255,255,.6);}
 
+/* Loading shimmer bar at top of PIN screen — visible while initial data load is in flight */
+.pin-loader{
+  position:absolute;top:0;left:0;right:0;height:2px;
+  background:rgba(196,154,108,.12);
+  overflow:hidden;opacity:0;transition:opacity .25s;
+  pointer-events:none;
+}
+.pin-loader.show{opacity:1;}
+.pin-loader::after{
+  content:'';position:absolute;top:0;bottom:0;left:-40%;width:40%;
+  background:#C49A6C;
+  animation:pin-loader-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes pin-loader-shimmer{
+  0%{left:-40%;} 100%{left:100%;}
+}
+
 /* ══════════════════════════════
    AUTH / FAMILY SCREENS
 ══════════════════════════════ */
@@ -803,6 +820,7 @@ input[placeholder="Optional note…"]:focus {
 
 <!-- ══ PIN SCREEN ══ -->
 <div id="pin-screen">
+  <div class="pin-loader" id="pin-loader"></div>
   <h1>Family <span>Budget</span></h1>
   <p class="pin-subtitle" id="pin-subtitle">Enter your PIN to continue</p>
   <div class="pin-dots" id="pin-dots">
@@ -1242,7 +1260,7 @@ const CATS = ['Groceries / Household','Utilities & Bills','Dining Out','Kids / C
 const MO   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MOS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DEFAULT_PIN = '1234';
-const APP_VERSION = '2.2.2'; // 2026-05-14 — PIN early-input fix, 3d cross-device email confirm UI, 4a personal-page sync indicator
+const APP_VERSION = '2.2.3'; // 2026-05-14 — PIN screen loader bar + loading subtitle ("just a sec" reassurance)
 
 /* ════════════════════════════════════════════════
    STATE
@@ -3844,6 +3862,13 @@ async function startDataLoad(){
     render();
     startListeners();
     _dataLoaded = true;
+    // Hide loader and restore default subtitle once data is ready
+    const ld = document.getElementById('pin-loader');
+    if(ld) ld.classList.remove('show');
+    const subtitle = document.getElementById('pin-subtitle');
+    if(subtitle && pinMode === 'unlock' && subtitle.textContent === 'Loading your budget…'){
+      subtitle.textContent = 'Enter your PIN to continue';
+    }
   })();
   return _dataLoadPromise;
 }
@@ -3884,8 +3909,15 @@ async function proceedToApp(){
     showScreen('app');
   } else {
     // Show PIN immediately; data continues loading in background.
-    // PIN-correct path awaits _dataLoadPromise before swapping to app.
+    // Visual reassurance: shimmer bar at top + "Loading your budget…" subtitle so users
+    // know something is happening rather than wondering if the keypad is frozen.
     showScreen('pin');
+    if(!_dataLoaded){
+      const ld = document.getElementById('pin-loader');
+      if(ld) ld.classList.add('show');
+      const subtitle = document.getElementById('pin-subtitle');
+      if(subtitle && pinMode === 'unlock') subtitle.textContent = 'Loading your budget…';
+    }
   }
 }
 
