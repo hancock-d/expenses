@@ -674,6 +674,9 @@ input[placeholder="Optional note…"]:focus {
       <div class="sec-hdr">
         <h2>Expenses</h2>
       </div>
+      <div style="padding:6px 12px 8px;">
+        <input type="text" id="exp-filter" placeholder="Filter all expenses…" oninput="filterAll(this.value)" style="width:100%;padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:.8rem;font-family:'DM Sans',sans-serif;background:white;color:var(--ink);">
+      </div>
 
       <!-- Recurring -->
       <div class="rzone">
@@ -721,9 +724,6 @@ input[placeholder="Optional note…"]:focus {
           </div>
         </div>
         <div class="zcollapse" id="e-body">
-          <div style="padding:6px 12px;border-bottom:1px solid var(--border);">
-            <input type="text" id="e-filter" placeholder="Filter expenses…" oninput="filterExp(this.value)" style="width:100%;padding:5px 10px;border:1px solid var(--border);border-radius:6px;font-size:.8rem;font-family:'DM Sans',sans-serif;background:white;color:var(--ink);">
-          </div>
           <table class="etable">
             <thead><tr>
               <th style="width:110px">Date</th>
@@ -1500,7 +1500,7 @@ function getCarryByKey(k){
 function render(){
   const md=getMD(Y,M);
   // Clear expense filter
-  const ef=document.getElementById('e-filter'); if(ef) ef.value='';
+  const ef=document.getElementById('exp-filter'); if(ef) ef.value='';
   const r=calcMonth(Y,M);
   const carry=getCarry(Y,M);
   const comb=r.balance+carry;
@@ -2155,20 +2155,30 @@ function clearOv(id){
   saveMD(); render();
 }
 
-function filterExp(q){
-  const tbody=document.getElementById('e-tbody');
-  if(!tbody) return;
+function filterAll(q){
   const term=q.toLowerCase().trim();
-  const rows=tbody.querySelectorAll('tr');
-  // Rows come in pairs: summary + detail
-  for(let r=0;r<rows.length;r+=2){
-    const sr=rows[r], dr=rows[r+1];
-    if(!sr) continue;
-    const text=(sr.textContent||'').toLowerCase();
-    const match=!term||text.includes(term);
-    sr.style.display=match?'':'none';
-    if(dr) dr.style.display=match?(dr.classList.contains('ec-hidden')?'none':''):'none';
-  }
+  // Filter rows in all three tbodies
+  ['r-tbody','e-tbody','c-tbody'].forEach(id=>{
+    const tbody=document.getElementById(id);
+    if(!tbody) return;
+    const rows=tbody.querySelectorAll('tr');
+    for(let r=0;r<rows.length;r++){
+      const row=rows[r];
+      const isSummary=row.classList.contains('rsummary-row')||row.classList.contains('ec-summary-row');
+      const isDetail=row.classList.contains('rdetail-row')||row.classList.contains('ec-detail-row');
+      if(isSummary){
+        const text=(row.textContent||'').toLowerCase();
+        const match=!term||text.includes(term);
+        row.style.display=match?'':'none';
+        // Also toggle the detail row
+        const next=rows[r+1];
+        if(next&&(next.classList.contains('rdetail-row')||next.classList.contains('ec-detail-row'))){
+          if(!match) next.style.display='none';
+          else next.style.display=(next.classList.contains('r-hidden')||next.classList.contains('ec-hidden'))?'none':'';
+        }
+      }
+    }
+  });
 }
 
 function addExp(){
