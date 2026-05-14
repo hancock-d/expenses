@@ -750,7 +750,7 @@ input[placeholder="Optional note…"]:focus {
 <body>
 
 <!-- ══ AUTH SCREEN ══ -->
-<div id="auth-screen" class="auth-screen show">
+<div id="auth-screen" class="auth-screen">
   <h1>Family <span>Budget</span></h1>
   <div class="auth-card">
     <div id="auth-stage-input" class="auth-stage">
@@ -823,6 +823,20 @@ input[placeholder="Optional note…"]:focus {
     <p id="pin-change-hint" style="font-size:.72rem;color:rgba(255,255,255,.3);display:none;text-align:center;max-width:240px;line-height:1.5"></p>
   </div>
 </div>
+
+<script>
+// Sync screen pick — runs immediately after screen elements are parsed, before any rendering.
+// Eliminates the auth-screen flash on boot for users with cached family ID.
+(function(){
+  try {
+    const showId = localStorage.getItem('bgt_family_id') ? 'pin-screen' : 'auth-screen';
+    var el = document.getElementById(showId);
+    if(el) el.classList.add('show');
+  } catch(e) {
+    document.getElementById('auth-screen').classList.add('show');
+  }
+})();
+</script>
 
 <!-- ══ APP ══ -->
 <div id="app">
@@ -1037,7 +1051,7 @@ input[placeholder="Optional note…"]:focus {
           <span class="dt-account-label">Signed in</span>
           <span class="dt-account-email" id="account-email">—</span>
         </div>
-        <button class="dt-btn dt-signout" onclick="signOutClick()">Sign out</button>
+        <button class="dt-btn dt-signout" onclick="confirmDel(this,()=>signOutClick())">Sign out</button>
       </div>
       <p class="dt-version">v<span id="dt-version">1.0.0</span></p>
     </div>
@@ -1219,7 +1233,7 @@ const CATS = ['Groceries / Household','Utilities & Bills','Dining Out','Kids / C
 const MO   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MOS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DEFAULT_PIN = '1234';
-const APP_VERSION = '2.2.0'; // 2026-05-14 — polish bundle: default-collapsed (3f), silent token refresh (3g), auth completion UX (3h), PWA pre-warning (3i)
+const APP_VERSION = '2.2.1'; // 2026-05-14 — boot-flash fix, PIN state reset on auth, sign-out two-tap verify
 
 /* ════════════════════════════════════════════════
    STATE
@@ -3768,6 +3782,22 @@ async function startDataLoad(){
 }
 
 async function proceedToApp(){
+  // Reset PIN state for this auth session. Without this, if pinMode was left in 'set-new' or
+  // 'confirm-new' from an incomplete previous change-PIN attempt (or stale PWA suspension state),
+  // the user's first 4 taps after sign-in would try to set a new PIN instead of unlocking.
+  pinMode = 'unlock';
+  pinEntry = '';
+  pinNewFirst = '';
+  const subtitle = document.getElementById('pin-subtitle');
+  if(subtitle) subtitle.textContent = 'Enter your PIN to continue';
+  const hint = document.getElementById('pin-change-hint');
+  if(hint){ hint.style.display = 'none'; hint.textContent = ''; }
+  const cb = document.getElementById('pin-change-btn');
+  if(cb) cb.textContent = 'Change PIN';
+  const errEl = document.getElementById('pin-err');
+  if(errEl) errEl.textContent = '';
+  updateDots(false);
+
   // _familyId is set. Kick off data loads, but DON'T await before showing PIN.
   // 3g: silent token refresh — fire-and-forget; signals iOS that storage is active,
   // and surfaces revoked tokens early (onAuthStateChanged will fire with null on revocation).
