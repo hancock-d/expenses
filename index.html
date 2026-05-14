@@ -20,6 +20,10 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, doc, getDoc, setDoc, onSnapshot }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import {
+  getAuth, sendSignInLinkToEmail, signInWithEmailLink, isSignInWithEmailLink,
+  onAuthStateChanged, signOut, setPersistence, browserLocalPersistence
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDDE3vZeWqHklkEkQCzXa2ioj5fJxH2RLw",
@@ -32,6 +36,10 @@ const firebaseConfig = {
 
 const fbApp = initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
+const auth = getAuth(fbApp);
+
+// Persist auth across refreshes / restarts
+setPersistence(auth, browserLocalPersistence).catch(e=>console.warn('Auth persistence:', e));
 
 // Helper: path string → Firestore doc ref (must have even segments)
 function dbDoc(path){
@@ -40,6 +48,7 @@ function dbDoc(path){
 }
 
 window._db = db;
+window._auth = auth;
 
 window._fbSet = async (path, data) => {
   try {
@@ -69,6 +78,16 @@ window._fbListen = (path, cb) => {
   );
 };
 
+// Auth helpers exposed to non-module script
+window._authSendLink = async (email, redirectUrl) => {
+  const actionCodeSettings = { url: redirectUrl, handleCodeInApp: true };
+  await sendSignInLinkToEmail(auth, email, actionCodeSettings);
+};
+window._authIsLink   = (url) => isSignInWithEmailLink(auth, url);
+window._authComplete = (email, url) => signInWithEmailLink(auth, email, url);
+window._authOnState  = (cb) => onAuthStateChanged(auth, cb);
+window._authSignOut  = () => signOut(auth);
+
 window.dispatchEvent(new Event('fb-ready'));
 </script>
 <style>
@@ -93,9 +112,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 #pin-screen {
   position:fixed;inset:0;z-index:9999;
   background:var(--ink);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  display:none;flex-direction:column;align-items:center;justify-content:center;
   gap:32px;padding:24px;
 }
+#pin-screen.show{display:flex;}
 #pin-screen h1{font-family:'DM Serif Display',serif;color:var(--cream);font-size:1.6rem;letter-spacing:-.02em;}
 #pin-screen h1 span{color:#C49A6C;}
 .pin-subtitle{font-size:.85rem;color:rgba(255,255,255,.5);margin-top:-20px;}
@@ -117,6 +137,68 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 .pin-change-area{display:flex;flex-direction:column;align-items:center;gap:8px;}
 .pin-change-btn{font-size:.75rem;color:rgba(255,255,255,.35);background:none;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;text-decoration:underline;padding:4px 8px;}
 .pin-change-btn:hover{color:rgba(255,255,255,.6);}
+
+/* ══════════════════════════════
+   AUTH / FAMILY SCREENS
+══════════════════════════════ */
+.auth-screen{
+  position:fixed;inset:0;z-index:9998;
+  background:var(--ink);
+  display:none;flex-direction:column;align-items:center;justify-content:center;
+  gap:24px;padding:24px;
+}
+.auth-screen.show{display:flex;}
+.auth-screen h1{font-family:'DM Serif Display',serif;color:var(--cream);font-size:1.6rem;letter-spacing:-.02em;}
+.auth-screen h1 span{color:#C49A6C;}
+.auth-card{
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);
+  border-radius:14px;padding:24px;max-width:340px;width:100%;
+  display:flex;flex-direction:column;gap:14px;
+}
+.auth-stage{display:flex;flex-direction:column;gap:12px;}
+.auth-blurb{font-size:.85rem;color:rgba(255,255,255,.7);line-height:1.5;}
+.auth-blurb strong{color:rgba(255,255,255,.95);font-weight:600;}
+.auth-h2{font-family:'DM Serif Display',serif;color:var(--cream);font-size:1.2rem;text-align:center;}
+.auth-card input[type=email]{
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);
+  border-radius:8px;padding:12px 14px;color:white;font-family:'DM Sans',sans-serif;
+  font-size:16px;outline:none;transition:border-color .15s;width:100%;
+}
+.auth-card input[type=email]:focus{border-color:#C49A6C;}
+.auth-card input[type=email]::placeholder{color:rgba(255,255,255,.3);}
+.auth-btn{
+  background:#C49A6C;color:var(--ink);border:none;border-radius:8px;padding:12px;
+  font-family:'DM Sans',sans-serif;font-size:.9rem;font-weight:600;cursor:pointer;
+  transition:background .15s;touch-action:manipulation;
+}
+.auth-btn:hover{background:#D5AB7D;}
+.auth-btn:disabled{opacity:.5;cursor:wait;}
+.auth-btn-secondary{
+  background:transparent;color:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.15);
+  border-radius:8px;padding:10px;font-family:'DM Sans',sans-serif;font-size:.8rem;
+  cursor:pointer;transition:all .15s;touch-action:manipulation;
+}
+.auth-btn-secondary:hover{color:white;border-color:rgba(255,255,255,.3);}
+.auth-err{font-size:.78rem;color:#e05252;min-height:1.2em;text-align:center;}
+.auth-check{
+  width:48px;height:48px;border-radius:50%;
+  background:rgba(196,154,108,.15);border:1px solid #C49A6C;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.5rem;color:#C49A6C;margin:0 auto 4px;
+}
+.auth-spinner{
+  width:32px;height:32px;border:3px solid rgba(255,255,255,.1);border-top-color:#C49A6C;
+  border-radius:50%;animation:auth-spin 1s linear infinite;margin:0 auto;
+}
+@keyframes auth-spin{to{transform:rotate(360deg);}}
+
+/* Account row in data-tools section */
+.dt-account{margin-top:14px;padding-top:14px;border-top:1px solid var(--lg);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;}
+.dt-account-info{display:flex;flex-direction:column;gap:2px;min-width:0;}
+.dt-account-label{font-size:.62rem;color:var(--slate);text-transform:uppercase;letter-spacing:.08em;font-weight:700;}
+.dt-account-email{font-size:.78rem;color:var(--ink);font-family:'DM Mono',monospace;word-break:break-all;}
+.dt-signout{background:transparent;color:var(--rust);border-color:var(--rust);}
+.dt-signout:hover{background:var(--rust);color:white;border-color:var(--rust);}
 
 /* ══════════════════════════════
    APP SHELL
@@ -582,6 +664,41 @@ input[placeholder="Optional note…"]:focus {
 </head>
 <body>
 
+<!-- ══ AUTH SCREEN ══ -->
+<div id="auth-screen" class="auth-screen show">
+  <h1>Family <span>Budget</span></h1>
+  <div class="auth-card">
+    <div id="auth-stage-input" class="auth-stage">
+      <p class="auth-blurb">Sign in with your email. We'll send you a one-tap link — no password needed.</p>
+      <input type="email" id="auth-email" placeholder="your@email.com" autocomplete="email" inputmode="email" autocapitalize="off" spellcheck="false">
+      <button class="auth-btn" id="auth-send-btn" onclick="authSendLink()">Send sign-in link</button>
+      <p class="auth-err" id="auth-err"></p>
+    </div>
+    <div id="auth-stage-sent" class="auth-stage" style="display:none">
+      <div class="auth-check">✉</div>
+      <h2 class="auth-h2">Check your inbox</h2>
+      <p class="auth-blurb">We sent a sign-in link to <strong id="auth-sent-email"></strong>. Open it on this device to continue.</p>
+      <button class="auth-btn-secondary" onclick="authResetToInput()">Use a different email</button>
+    </div>
+    <div id="auth-stage-completing" class="auth-stage" style="display:none">
+      <div class="auth-spinner"></div>
+      <p class="auth-blurb" style="text-align:center">Signing you in…</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══ FAMILY SCREEN ══ -->
+<div id="family-screen" class="auth-screen">
+  <h1>Family <span>Budget</span></h1>
+  <div class="auth-card">
+    <p class="auth-blurb">Signed in as <strong id="family-user-email">—</strong>.</p>
+    <p class="auth-blurb">You're not part of a family yet. Create one to start tracking expenses. You can invite others later.</p>
+    <button class="auth-btn" id="family-create-btn" onclick="authCreateFamilyClick()">Create new family</button>
+    <button class="auth-btn-secondary" onclick="signOutClick()">Sign out</button>
+    <p class="auth-err" id="family-err"></p>
+  </div>
+</div>
+
 <!-- ══ PIN SCREEN ══ -->
 <div id="pin-screen">
   <h1>Family <span>Budget</span></h1>
@@ -808,6 +925,13 @@ input[placeholder="Optional note…"]:focus {
         <button class="dt-btn dt-import" onclick="document.getElementById('import-file').click()">⬆ Import JSON</button>
         <input type="file" id="import-file" accept=".json,application/json" style="display:none" onchange="importJSON(this)">
       </div>
+      <div class="dt-account">
+        <div class="dt-account-info">
+          <span class="dt-account-label">Signed in</span>
+          <span class="dt-account-email" id="account-email">—</span>
+        </div>
+        <button class="dt-btn dt-signout" onclick="signOutClick()">Sign out</button>
+      </div>
       <p class="dt-version">v<span id="dt-version">1.0.0</span></p>
     </div>
   </main>
@@ -988,7 +1112,7 @@ const CATS = ['Groceries / Household','Utilities & Bills','Dining Out','Kids / C
 const MO   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MOS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DEFAULT_PIN = '1234';
-const APP_VERSION = '1.3.0'; // 2026-04 — collapsible rows, reorder, auto-credits, annual/semiannual, confirmDel, tech debt cleanup
+const APP_VERSION = '2.0.0'; // 2026-05 — auth (email link) + multi-tenant family data model
 
 /* ════════════════════════════════════════════════
    STATE
@@ -998,6 +1122,20 @@ let DB = {};
 let RECUR = [];
 let name1='Person 1', name2='Person 2';
 let rOpen=true, cOpen=false, eOpen=true;
+
+// Auth + family state
+let _currentUser = null;    // Firebase user object (set after sign-in)
+let _familyId    = null;    // Active family ID
+try { _familyId = localStorage.getItem('bgt_family_id') || null; } catch(e) {}
+
+// All Firestore reads/writes go through paths returned by this helper.
+// Old paths (budget/meta, months/*, persMeta/data, personal_1/*, personal_2/*)
+// remain untouched in Firestore — locked at rules level. Migration is Session 2.
+function _famPath(p){
+  if(!_familyId) throw new Error('No family ID set; cannot access family data');
+  return 'families/' + _familyId + '/' + p;
+}
+window._famPath = _famPath;
 // Track collapsed row indices across re-renders
 let _collapsedRecur=new Set();
 let _collapsedExp=new Set();
@@ -1033,7 +1171,7 @@ function getStoredPin(){ return localStorage.getItem('bgt_pin')||DEFAULT_PIN; }
 function savePin(p){
   localStorage.setItem('bgt_pin',p);
   // Sync PIN to Firebase so both devices share it
-  if(window._fbSet) window._fbSet('budget/meta',{pin:p});
+  if(window._fbSet && _familyId) window._fbSet(_famPath('budget/meta'),{pin:p});
 }
 
 function pinKey(d){
@@ -1058,7 +1196,7 @@ function checkPin(){
   const stored=getStoredPin();
   if(pinMode==='unlock'){
     if(pinEntry===stored){
-      document.getElementById('pin-screen').style.display='none';
+      document.getElementById('pin-screen').classList.remove('show');
       document.getElementById('app').classList.add('unlocked');
       sessionStorage.setItem('bgt_unlocked','1');
     } else {
@@ -1115,7 +1253,7 @@ function startChangePin(){
 function lockApp(){
   sessionStorage.removeItem('bgt_unlocked');
   document.getElementById('app').classList.remove('unlocked');
-  document.getElementById('pin-screen').style.display='flex';
+  document.getElementById('pin-screen').classList.add('show');
   pinMode='unlock'; pinEntry='';
   updateDots(false);
   document.getElementById('pin-err').textContent='';
@@ -1143,7 +1281,7 @@ async function saveMeta(){
   // localStorage cache
   try{ localStorage.setItem('bgt_meta',JSON.stringify(data)); }catch(e){}
   // Firebase
-  if(window._fbSet){ setSyncing(); const ok=await window._fbSet('budget/meta',data); ok?setSynced():setSyncError(); }
+  if(window._fbSet && _familyId){ setSyncing(); const ok=await window._fbSet(_famPath('budget/meta'),data); ok?setSynced():setSyncError(); }
 }
 function saveNames(){ name1=document.getElementById('name1').value||'Person 1'; name2=document.getElementById('name2').value||'Person 2'; saveMeta(); }
 
@@ -1163,10 +1301,10 @@ async function saveMD(){
   try{ localStorage.setItem('bgt_'+k,JSON.stringify(data)); }catch(e){}
   // Firebase — serialize the entire month as a JSON string in a single field
   // This avoids any Firestore nesting/array issues
-  if(window._fbSet){
+  if(window._fbSet && _familyId){
     setSyncing();
     const payload = {data: JSON.stringify(data), ts: Date.now()};
-    const ok = await window._fbSet('months/'+k, payload);
+    const ok = await window._fbSet(_famPath('months/'+k), payload);
     if(ok){ setSynced(); console.log('Saved month', k, 'to Firebase'); }
     else{ setSyncError(); console.error('Failed to save month', k); }
   }
@@ -1189,9 +1327,9 @@ async function loadAll(){
   }
 
   // Then fetch from Firebase and merge (Firebase is source of truth)
-  if(window._fbGet){
+  if(window._fbGet && _familyId){
     try{
-      const meta=await window._fbGet('budget/meta');
+      const meta=await window._fbGet(_famPath('budget/meta'));
       if(meta){
         name1=meta.name1||'Person 1'; name2=meta.name2||'Person 2';
         RECUR=meta.recur||[]; rOpen=meta.rOpen!==false; cOpen=meta.cOpen===true; eOpen=meta.eOpen!==false;
@@ -1206,7 +1344,7 @@ async function loadAll(){
         return mk(d.getFullYear(),d.getMonth());
       })])];
       await Promise.all(allMonthKeys.map(async k=>{
-        const doc=await window._fbGet('months/'+k);
+        const doc=await window._fbGet(_famPath('months/'+k));
         if(doc&&doc.data){ try{ DB[k]=JSON.parse(doc.data); localStorage.setItem('bgt_'+k,doc.data); }catch(e){} }
       }));
     }catch(e){ console.warn('Firebase load failed, using cache',e); }
@@ -1215,12 +1353,13 @@ async function loadAll(){
 
 // Real-time listener — updates app when other device makes changes
 let _listenersActive=false;
+let _metaUnsub=null, _persMetaUnsub=null;
 function startListeners(){
-  if(_listenersActive||!window._fbListen) return;
+  if(_listenersActive||!window._fbListen||!_familyId) return;
   _listenersActive=true;
 
   // Listen to meta (names, RECUR templates)
-  window._fbListen('budget/meta', data=>{
+  _metaUnsub=window._fbListen(_famPath('budget/meta'), data=>{
     if(!data) return;
     const prev=JSON.stringify({name1,name2,recur:RECUR});
     name1=data.name1||'Person 1'; name2=data.name2||'Person 2';
@@ -1236,7 +1375,7 @@ function startListeners(){
   listenCurrentMonth();
 
   // Listen to persMeta
-  window._fbListen('persMeta/data', data=>{
+  _persMetaUnsub=window._fbListen(_famPath('persMeta/data'), data=>{
     if(!data) return;
     PSUBS=data.subs||{'1':[],'2':[]};
     persSubOpen=data.subOpen||{'1':true,'2':true};
@@ -1244,12 +1383,20 @@ function startListeners(){
   });
 }
 
+function stopListeners(){
+  if(_metaUnsub){ _metaUnsub(); _metaUnsub=null; }
+  if(_persMetaUnsub){ _persMetaUnsub(); _persMetaUnsub=null; }
+  if(_monthUnsub){ _monthUnsub(); _monthUnsub=null; }
+  if(_persMonthUnsub){ _persMonthUnsub(); _persMonthUnsub=null; }
+  _listenersActive=false;
+}
+
 let _monthUnsub=null;
 function listenCurrentMonth(){
   if(_monthUnsub){ _monthUnsub(); _monthUnsub=null; }
-  if(!window._fbListen) return;
+  if(!window._fbListen||!_familyId) return;
   const k=mk(Y,M);
-  _monthUnsub=window._fbListen('months/'+k, data=>{
+  _monthUnsub=window._fbListen(_famPath('months/'+k), data=>{
     if(!data||!data.data) return;
     try{
       const parsed=JSON.parse(data.data);
@@ -2342,9 +2489,9 @@ async function loadPersonal(){
     }
   }
   // Load from Firebase
-  if(window._fbGet){
+  if(window._fbGet && _familyId){
     try{
-      const pm=await window._fbGet('persMeta/data');
+      const pm=await window._fbGet(_famPath('persMeta/data'));
       if(pm){ PSUBS=pm.subs||{'1':[],'2':[]}; persSubOpen=pm.subOpen||{'1':true,'2':true};
         localStorage.setItem('bgt_pers_meta',JSON.stringify({subs:PSUBS,subOpen:persSubOpen})); }
       // Load personal months for both people, last 24 months
@@ -2354,7 +2501,7 @@ async function loadPersonal(){
           return mk(d.getFullYear(),d.getMonth());
         });
         await Promise.all(keys.map(async k=>{
-          const doc=await window._fbGet('personal_'+who+'/'+k);
+          const doc=await window._fbGet(_famPath('personal_'+who+'/'+k));
           if(doc&&doc.data){ try{ PDB[who][k]=JSON.parse(doc.data); localStorage.setItem('bgt_p'+who+'_'+k,doc.data); }catch(e){} }
         }));
       }
@@ -2364,7 +2511,7 @@ async function loadPersonal(){
 async function savePMeta(){
   const data={subs:PSUBS,subOpen:persSubOpen};
   try{ localStorage.setItem('bgt_pers_meta',JSON.stringify(data)); }catch(e){}
-  if(window._fbSet){ setSyncing(); const ok=await window._fbSet('persMeta/data',data); ok?setSynced():setSyncError(); }
+  if(window._fbSet && _familyId){ setSyncing(); const ok=await window._fbSet(_famPath('persMeta/data'),data); ok?setSynced():setSyncError(); }
 }
 function getPMD(who,y,m){
   const k=mk(y,m);
@@ -2380,7 +2527,7 @@ async function savePMD(who){
   const k=mk(PY,PM);
   const data=PDB[who][k];
   try{ localStorage.setItem('bgt_p'+who+'_'+k, JSON.stringify(data)); }catch(e){}
-  if(window._fbSet){ setSyncing(); const ok=await window._fbSet('personal_'+who+'/'+k,{data:JSON.stringify(data)}); ok?setSynced():setSyncError(); }
+  if(window._fbSet && _familyId){ setSyncing(); const ok=await window._fbSet(_famPath('personal_'+who+'/'+k),{data:JSON.stringify(data)}); ok?setSynced():setSyncError(); }
 }
 // Personal months use the same key format as joint months
 
@@ -2458,9 +2605,9 @@ function openPersonal(who){
 }
 function listenPersMonth(){
   if(_persMonthUnsub){ _persMonthUnsub(); _persMonthUnsub=null; }
-  if(!window._fbListen) return;
+  if(!window._fbListen||!_familyId) return;
   const k=mk(PY,PM);
-  _persMonthUnsub=window._fbListen('personal_'+persWho+'/'+k, data=>{
+  _persMonthUnsub=window._fbListen(_famPath('personal_'+persWho+'/'+k), data=>{
     if(!data||!data.data) return;
     try{
       const parsed=JSON.parse(data.data);
@@ -3137,17 +3284,17 @@ async function importJSON(input){
     document.getElementById('name2').value = name2;
 
     // Write everything to Firebase
-    if(window._fbSet){
+    if(window._fbSet && _familyId){
       setSyncing();
       const writes = [];
-      writes.push(window._fbSet('budget/meta', {name1,name2,recur:RECUR,rOpen,cOpen,eOpen}));
-      writes.push(window._fbSet('persMeta/data', {subs:PSUBS, subOpen:persSubOpen}));
+      writes.push(window._fbSet(_famPath('budget/meta'), {name1,name2,recur:RECUR,rOpen,cOpen,eOpen}));
+      writes.push(window._fbSet(_famPath('persMeta/data'), {subs:PSUBS, subOpen:persSubOpen}));
       Object.keys(DB).forEach(k => {
-        writes.push(window._fbSet('months/'+k, {data: JSON.stringify(DB[k]), ts: Date.now()}));
+        writes.push(window._fbSet(_famPath('months/'+k), {data: JSON.stringify(DB[k]), ts: Date.now()}));
       });
       ['1','2'].forEach(who => {
         Object.keys(PDB[who]||{}).forEach(k => {
-          writes.push(window._fbSet('personal_'+who+'/'+k, {data: JSON.stringify(PDB[who][k]), ts: Date.now()}));
+          writes.push(window._fbSet(_famPath('personal_'+who+'/'+k), {data: JSON.stringify(PDB[who][k]), ts: Date.now()}));
         });
       });
       const results = await Promise.all(writes);
@@ -3181,10 +3328,260 @@ async function importJSON(input){
    KEYBOARD SUPPORT FOR PIN
 ════════════════════════════════════════════════ */
 document.addEventListener('keydown',e=>{
-  if(document.getElementById('pin-screen').style.display==='none') return;
+  if(!document.getElementById('pin-screen').classList.contains('show')) return;
   if(e.key>='0'&&e.key<='9') pinKey(e.key);
   else if(e.key==='Backspace') pinDel();
 });
+
+/* ════════════════════════════════════════════════
+   AUTH + FAMILY FLOW
+════════════════════════════════════════════════ */
+function showScreen(name){
+  // 'auth' | 'family' | 'pin' | 'app'
+  const a=document.getElementById('auth-screen');
+  const f=document.getElementById('family-screen');
+  const p=document.getElementById('pin-screen');
+  const app=document.getElementById('app');
+  a.classList.toggle('show', name==='auth');
+  f.classList.toggle('show', name==='family');
+  p.classList.toggle('show', name==='pin');
+  app.classList.toggle('unlocked', name==='app');
+}
+
+function authShowError(msg, where){
+  const el=document.getElementById(where||'auth-err');
+  if(el) el.textContent=msg||'';
+}
+function _friendlyAuthError(e){
+  const code=(e&&e.code)||'';
+  if(code==='auth/invalid-email')           return 'That email address looks invalid.';
+  if(code==='auth/missing-email')           return 'Please enter your email.';
+  if(code==='auth/quota-exceeded')          return 'Too many requests — try again later.';
+  if(code==='auth/too-many-requests')       return 'Too many attempts — wait a moment, then try again.';
+  if(code==='auth/network-request-failed')  return 'Network error — check your connection.';
+  if(code==='auth/invalid-action-code')     return 'This sign-in link is invalid or already used.';
+  if(code==='auth/expired-action-code')     return 'This sign-in link has expired. Request a new one.';
+  if(code==='permission-denied')            return 'Permission denied. Try signing out and back in.';
+  return (e&&e.message)||'Something went wrong. Try again.';
+}
+
+function authStageInput(){
+  document.getElementById('auth-stage-input').style.display='flex';
+  document.getElementById('auth-stage-sent').style.display='none';
+  document.getElementById('auth-stage-completing').style.display='none';
+}
+function authStageSent(email){
+  document.getElementById('auth-stage-input').style.display='none';
+  document.getElementById('auth-stage-sent').style.display='flex';
+  document.getElementById('auth-stage-completing').style.display='none';
+  document.getElementById('auth-sent-email').textContent=email;
+}
+function authStageCompleting(){
+  document.getElementById('auth-stage-input').style.display='none';
+  document.getElementById('auth-stage-sent').style.display='none';
+  document.getElementById('auth-stage-completing').style.display='flex';
+}
+function authResetToInput(){
+  try{ localStorage.removeItem('bgt_auth_email'); }catch(e){}
+  authShowError('');
+  authStageInput();
+}
+
+async function authSendLink(){
+  authShowError('');
+  const emailEl=document.getElementById('auth-email');
+  const sendBtn=document.getElementById('auth-send-btn');
+  const email=(emailEl.value||'').trim().toLowerCase();
+  if(!email||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+    authShowError('Enter a valid email address');
+    return;
+  }
+  sendBtn.disabled=true;
+  sendBtn.textContent='Sending…';
+  try{
+    const redirect=window.location.origin+window.location.pathname;
+    await window._authSendLink(email, redirect);
+    try{ localStorage.setItem('bgt_auth_email', email); }catch(e){}
+    authStageSent(email);
+  }catch(e){
+    console.error('Send link failed:', e);
+    authShowError(_friendlyAuthError(e));
+  }finally{
+    sendBtn.disabled=false;
+    sendBtn.textContent='Send sign-in link';
+  }
+}
+
+async function authCompleteFromUrl(){
+  if(!window._authIsLink||!window._authIsLink(window.location.href)) return false;
+  authStageCompleting();
+  let email=null;
+  try{ email=localStorage.getItem('bgt_auth_email'); }catch(e){}
+  if(!email){
+    // Different device — prompt
+    email=prompt('Confirm your email to complete sign-in:');
+    if(!email){
+      authShowError('Sign-in cancelled.');
+      authStageInput();
+      return false;
+    }
+    email=email.trim().toLowerCase();
+  }
+  try{
+    await window._authComplete(email, window.location.href);
+    try{ localStorage.removeItem('bgt_auth_email'); }catch(e){}
+    // Clean URL — strip the email-link query params
+    if(history.replaceState){
+      history.replaceState({}, document.title, window.location.origin+window.location.pathname);
+    }
+    return true;
+  }catch(e){
+    console.error('Complete sign-in failed:', e);
+    authShowError(_friendlyAuthError(e));
+    authStageInput();
+    return false;
+  }
+}
+
+function genFamilyId(){
+  const chars='abcdefghijklmnopqrstuvwxyz0123456789';
+  let s='fam_';
+  for(let i=0;i<12;i++) s+=chars[Math.floor(Math.random()*chars.length)];
+  return s;
+}
+
+async function lookupFamily(uid){
+  if(!window._fbGet) return null;
+  const data=await window._fbGet('userFamilies/'+uid);
+  return (data&&data.familyId)||null;
+}
+
+async function createFamilyForUser(uid, email){
+  if(!window._fbSet) throw new Error('Firebase not ready');
+  const newFamId=genFamilyId();
+  // Order matters — rules require membership for family writes.
+  // 1) Create membership doc (rule allows when request.auth.uid === uid)
+  const memOk=await window._fbSet('families/'+newFamId+'/members/'+uid, {
+    email: email||null, role: 'owner', addedAt: Date.now()
+  });
+  if(!memOk) throw new Error('Could not create membership');
+  // 2) Create userFamilies routing doc
+  const routeOk=await window._fbSet('userFamilies/'+uid, {
+    familyId: newFamId, createdAt: Date.now()
+  });
+  if(!routeOk) throw new Error('Could not create user→family link');
+  // 3) Seed family meta with defaults (now allowed — user is a member)
+  const metaOk=await window._fbSet('families/'+newFamId+'/budget/meta', {
+    name1:'Person 1', name2:'Person 2', recur:[],
+    rOpen:true, cOpen:false, eOpen:true,
+    createdAt: Date.now()
+  });
+  if(!metaOk) throw new Error('Could not create family meta');
+  return newFamId;
+}
+
+async function authCreateFamilyClick(){
+  authShowError('', 'family-err');
+  if(!_currentUser){
+    authShowError('Not signed in.', 'family-err');
+    return;
+  }
+  const btn=document.getElementById('family-create-btn');
+  btn.disabled=true;
+  btn.textContent='Creating…';
+  try{
+    const famId=await createFamilyForUser(_currentUser.uid, _currentUser.email);
+    _familyId=famId;
+    try{ localStorage.setItem('bgt_family_id', famId); }catch(e){}
+    await proceedToApp();
+  }catch(e){
+    console.error('Create family failed:', e);
+    authShowError(_friendlyAuthError(e), 'family-err');
+  }finally{
+    btn.disabled=false;
+    btn.textContent='Create new family';
+  }
+}
+
+async function signOutClick(){
+  // Tear down listeners first so we don't get permission-denied bursts after sign-out
+  try{ stopListeners(); }catch(e){}
+  // Clear cached state
+  try{
+    localStorage.removeItem('bgt_family_id');
+    localStorage.removeItem('bgt_auth_email');
+    localStorage.removeItem('bgt_meta');
+    localStorage.removeItem('bgt_pers_meta');
+    localStorage.removeItem('bgt_pin');
+    Object.keys(localStorage).forEach(k=>{
+      if(/^bgt_(p[12]_)?\d{4}-\d{2}$/.test(k)) localStorage.removeItem(k);
+    });
+    sessionStorage.removeItem('bgt_unlocked');
+  }catch(e){}
+  // Reset in-memory state
+  _familyId=null;
+  _currentUser=null;
+  DB={}; PDB={'1':{},'2':{}};
+  RECUR=[]; PSUBS={'1':[],'2':[]};
+  name1='Person 1'; name2='Person 2';
+  rOpen=true; cOpen=false; eOpen=true;
+  persSubOpen={'1':true,'2':true};
+  // Sign out from Firebase
+  try{ if(window._authSignOut) await window._authSignOut(); }catch(e){ console.warn('Sign-out:', e); }
+  // Reset UI
+  const ae=document.getElementById('account-email'); if(ae) ae.textContent='—';
+  authResetToInput();
+  showScreen('auth');
+}
+
+async function proceedToApp(){
+  // _familyId is set. Load data, then show PIN (or skip to app if session unlocked).
+  await loadAll();
+  await loadPersonal();
+  getMD(Y,M); seedMonth(Y,M);
+  render();
+  startListeners();
+  // Update account email in data-tools section
+  const ae=document.getElementById('account-email');
+  if(ae && _currentUser) ae.textContent=_currentUser.email||_currentUser.uid;
+  // PIN gate (session-scoped bypass)
+  if(sessionStorage.getItem('bgt_unlocked')==='1'){
+    showScreen('app');
+  } else {
+    showScreen('pin');
+  }
+}
+
+async function handleAuthState(user){
+  if(!user){
+    // Signed out
+    _currentUser=null;
+    _familyId=null;
+    try{ localStorage.removeItem('bgt_family_id'); }catch(e){}
+    const ae=document.getElementById('account-email'); if(ae) ae.textContent='—';
+    showScreen('auth');
+    authStageInput();
+    return;
+  }
+  _currentUser=user;
+  // Try cached family ID first (offline-friendly)
+  let famId=null;
+  try{ famId=localStorage.getItem('bgt_family_id')||null; }catch(e){}
+  if(!famId){
+    try{ famId=await lookupFamily(user.uid); }catch(e){ console.warn('Family lookup:', e); }
+  }
+  if(famId){
+    _familyId=famId;
+    try{ localStorage.setItem('bgt_family_id', famId); }catch(e){}
+    await proceedToApp();
+  } else {
+    // No family yet — first-time-user flow
+    const fue=document.getElementById('family-user-email');
+    if(fue) fue.textContent=user.email||user.uid;
+    authShowError('', 'family-err');
+    showScreen('family');
+  }
+}
 
 /* ════════════════════════════════════════════════
    INIT
@@ -3196,7 +3593,8 @@ document.getElementById('nextMonth').addEventListener('click',()=>changeMonth(1)
   console.log('Family Budget v' + APP_VERSION);
   const dtv = document.getElementById('dt-version');
   if(dtv) dtv.textContent = APP_VERSION;
-  // Show offline cache immediately while Firebase loads
+
+  // Best-effort cached display name (will be overridden after family resolved)
   try{
     const m=JSON.parse(localStorage.getItem('bgt_meta')||'{}');
     name1=m.name1||'Person 1'; name2=m.name2||'Person 2';
@@ -3207,28 +3605,24 @@ document.getElementById('nextMonth').addEventListener('click',()=>changeMonth(1)
 
   const n=new Date(); Y=n.getFullYear(); M=n.getMonth();
 
-  // Stay unlocked if session is active
-  if(sessionStorage.getItem('bgt_unlocked')==='1'){
-    document.getElementById('pin-screen').style.display='none';
-    document.getElementById('app').classList.add('unlocked');
-  }
-
-  // Wait for Firebase to be ready (module script runs async)
+  // Wait for Firebase module to register globals
   await new Promise(res=>{
-    if(window._fbGet) return res();
+    if(window._auth) return res();
     window.addEventListener('fb-ready', res, {once:true});
-    setTimeout(res, 3000); // fallback: proceed after 3s even if Firebase is slow
+    setTimeout(res, 3000); // proceed after 3s even if SDK is slow
   });
 
-  // Load all data (Firebase + cache merge)
-  await loadAll();
-  await loadPersonal();
+  if(!window._auth){
+    console.error('Firebase Auth did not load. App will not work offline-only.');
+    showScreen('auth');
+    return;
+  }
 
-  getMD(Y,M); seedMonth(Y,M);
-  render();
+  // If returning from an email-link click, complete sign-in first
+  await authCompleteFromUrl();
 
-  // Start real-time listeners after initial render
-  startListeners();
+  // Subscribe to auth state — drives the rest of the UI
+  window._authOnState(user => { handleAuthState(user); });
 })();
 </script>
 </body>
