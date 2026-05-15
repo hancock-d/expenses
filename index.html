@@ -1260,7 +1260,7 @@ const CATS = ['Groceries / Household','Utilities & Bills','Dining Out','Kids / C
 const MO   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MOS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DEFAULT_PIN = '1234';
-const APP_VERSION = '2.3.0'; // 2026-05-14 — per-user PIN, family-scoped cache, dialog cleanup
+const APP_VERSION = '2.3.1'; // 2026-05-14 — verify family membership before cached data load
 
 /* ════════════════════════════════════════════════
    STATE
@@ -1276,7 +1276,6 @@ let _currentUser = null;    // Firebase user object (set after sign-in)
 let _familyId    = null;    // Active family ID
 let _familyMembers = [];    // [{uid, email, role, addedAt}] live from members subcollection
 let _isOwner = false;       // true if _currentUser is owner of _familyId
-try { _familyId = localStorage.getItem('bgt_family_id') || null; } catch(e) {}
 
 // All Firestore reads/writes go through paths returned by this helper.
 // Old paths (budget/meta, months/*, persMeta/data, personal_1/*, personal_2/*)
@@ -1308,6 +1307,13 @@ function cleanupLegacyCache(){
         localStorage.removeItem(k);
       }
     });
+  }catch(e){}
+}
+function clearFamilyCache(fid){
+  if(!fid) return;
+  const p='bgt_' + fid + '_';
+  try{
+    Object.keys(localStorage).forEach(k=>{ if(k.startsWith(p)) localStorage.removeItem(k); });
   }catch(e){}
 }
 // Track collapsed row indices across re-renders
@@ -3848,6 +3854,26 @@ async function lookupFamily(uid){
   return (data&&data.familyId)||null;
 }
 
+async function verifyFamilyMembership(fid, uid){
+  if(!window._fbGet||!fid||!uid) return false;
+  const member=await window._fbGet('families/'+fid+'/members/'+uid);
+  return !!member;
+}
+
+async function clearInvalidFamilyAccess(fid, uid){
+  clearFamilyCache(fid);
+  try{
+    if(localStorage.getItem('bgt_family_id')===fid) localStorage.removeItem('bgt_family_id');
+    if(localStorage.getItem('bgt_uid')===uid) localStorage.removeItem('bgt_uid');
+  }catch(e){}
+  if(window._fbDelete&&uid){
+    try{ await window._fbDelete('userFamilies/'+uid); }catch(e){}
+  }
+  if(_familyId===fid) _familyId=null;
+  DB={}; PDB={'1':{},'2':{}};
+  RECUR=[]; PSUBS={'1':[],'2':[]};
+}
+
 async function createFamilyForUser(uid, email){
   if(!window._fbSet) throw new Error('Firebase not ready');
   const newFamId=genFamilyId();
@@ -4033,11 +4059,16 @@ async function handleAuthState(user){
     try{ famId=await lookupFamily(user.uid); }catch(e){ console.warn('Family lookup:', e); }
   }
   if(famId){
-    _familyId=famId;
-    try{ localStorage.setItem('bgt_family_id', famId); localStorage.setItem('bgt_uid', user.uid); }catch(e){}
-    cleanupLegacyCache();
-    await proceedToApp();
-    return;
+    const isMember=await verifyFamilyMembership(famId, user.uid);
+    if(isMember){
+      _familyId=famId;
+      try{ localStorage.setItem('bgt_family_id', famId); localStorage.setItem('bgt_uid', user.uid); }catch(e){}
+      cleanupLegacyCache();
+      await proceedToApp();
+      return;
+    }
+    console.warn('Family membership could not be verified; clearing cached family access:', famId);
+    await clearInvalidFamilyAccess(famId, user.uid);
   }
   // No family — check for pending invites against this user's email
   if(user.email){
@@ -4055,7 +4086,7 @@ async function handleAuthState(user){
   // Still no family — first-time-user flow
   const fue=document.getElementById('family-user-email');
   if(fue) fue.textContent=user.email||user.uid;
-  authShowError('', 'family-err');
+  authShowError(famId?'Your family access could not be verified. Ask the owner for a new invite, or create a new family.':'', 'family-err');
   showScreen('family');
 }
 
