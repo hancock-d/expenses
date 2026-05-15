@@ -395,7 +395,8 @@ main{max-width:1100px;margin:0 auto;padding:18px 14px calc(18px + var(--safe-bot
 .rname-edit:focus{border-color:var(--rv);background:white;}
 .rname-edit:empty::before{content:attr(data-placeholder);color:var(--slate);opacity:.5;font-style:italic;}
 @media(max-width:640px){
-  .rname-edit{font-size:16px;}
+  .rsummary-row .rname-edit{font-size:.82rem;}
+  .rname-edit:focus{font-size:16px;}
 }
 .rexp-toggle{background:var(--rbg);border:1px solid var(--rb);font-size:.65rem;color:var(--rv);cursor:pointer;padding:6px 8px;border-radius:4px;vertical-align:middle;flex-shrink:0;touch-action:manipulation;line-height:1;}
 .rexp-toggle:hover{background:var(--rb);color:white;}
@@ -1260,7 +1261,7 @@ const CATS = ['Groceries / Household','Utilities & Bills','Dining Out','Kids / C
 const MO   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MOS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DEFAULT_PIN = '1234';
-const APP_VERSION = '2.3.1'; // 2026-05-14 — verify family membership before cached data load
+const APP_VERSION = '2.3.2'; // 2026-05-14 — recurring typography polish + dev test harness
 
 /* ════════════════════════════════════════════════
    STATE
@@ -3441,6 +3442,47 @@ function showToast(msg){
   clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2200);
 }
 
+function runDevTests(){
+  const results=[];
+  const snap={Y,M,DB,RECUR,name1,name2,_familyId};
+  const assert=(name,ok,detail='')=>{ results.push({name,ok,detail}); if(!ok) throw new Error(name+(detail?': '+detail:'')); };
+  const approx=(a,b)=>Math.abs(a-b)<0.0001;
+  try{
+    assert('fmt formats money', fmt(1234.5)==='$1,234.50');
+    assert('ordinal suffixes', ordinal(1)==='1st'&&ordinal(2)==='2nd'&&ordinal(3)==='3rd'&&ordinal(11)==='11th');
+    assert('mk zero-pads months', mk(2026,0)==='2026-01');
+    assert('chargeDate clamps month end', chargeDate(31,2026,1)==='2026-02-28');
+    const weekly=getRecurDates({frequency:'weekly',anchorDate:'2026-04-01'},2026,3);
+    assert('weekly recurrence dates', weekly.length===5&&weekly[0]==='2026-04-01'&&weekly[4]==='2026-04-29', weekly.join(','));
+    const biweekly=getRecurDates({frequency:'biweekly',anchorDate:'2026-04-03'},2026,3);
+    assert('biweekly recurrence dates', biweekly.length===2&&biweekly[0]==='2026-04-03'&&biweekly[1]==='2026-04-17', biweekly.join(','));
+    _familyId='fam_test';
+    assert('family cache key prefixes', _cacheKey('meta')==='bgt_fam_test_meta');
+    Y=2026; M=3; name1='Person 1'; name2='Person 2';
+    RECUR=[{id:'r1',amount:'40'}];
+    DB={'2026-04':{expenses:[
+      {amount:'100',paidBy:'1'},
+      {amount:'50',paidBy:'2'},
+      {amount:'40',paidBy:'1',recurId:'r1'}
+    ],credits:[
+      {amount:'20',to:'1'},
+      {amount:'10',to:'shared'}
+    ],settled:false,skips:{},overrides:{}}};
+    const r=calcMonth(2026,3);
+    assert('calcMonth paid totals', approx(r.paid1,140)&&approx(r.paid2,50), JSON.stringify(r));
+    assert('calcMonth credit nets', approx(r.net1,115)&&approx(r.net2,45)&&approx(r.balance,70), JSON.stringify(r));
+    console.table(results);
+    showToast('Dev tests passed');
+    return true;
+  }catch(e){
+    console.error('Dev tests failed:', e, results);
+    showToast('Dev tests failed: '+e.message);
+    return false;
+  }finally{
+    Y=snap.Y; M=snap.M; DB=snap.DB; RECUR=snap.RECUR; name1=snap.name1; name2=snap.name2; _familyId=snap._familyId;
+  }
+}
+
 /* ════════════════════════════════════════════════
    IMPORT / EXPORT
 ════════════════════════════════════════════════ */
@@ -4299,6 +4341,10 @@ document.getElementById('nextMonth').addEventListener('click',()=>changeMonth(1)
   }catch(e){}
 
   const n=new Date(); Y=n.getFullYear(); M=n.getMonth();
+  try{
+    const params=new URLSearchParams(window.location.search);
+    if(params.has('test')||window.location.hash==='#test') runDevTests();
+  }catch(e){ console.warn('Dev test bootstrap failed:', e); }
 
   // Wait for Firebase module to register globals
   await new Promise(res=>{
