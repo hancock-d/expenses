@@ -1056,7 +1056,7 @@ input[placeholder="Optional note…"]:focus {
       <div class="dt-buttons">
         <button class="dt-btn" onclick="exportJSON()">⬇ Export JSON</button>
         <button class="dt-btn" onclick="exportCSV()">⬇ Export CSV</button>
-        <button class="dt-btn dt-import" onclick="document.getElementById('import-file').click()">⬆ Import JSON</button>
+        <button class="dt-btn dt-import" onclick="confirmImportClick(this)">⬆ Import JSON</button>
         <input type="file" id="import-file" accept=".json,application/json" style="display:none" onchange="importJSON(this)">
       </div>
       <div class="dt-family">
@@ -1069,7 +1069,7 @@ input[placeholder="Optional note…"]:focus {
           </div>
           <div class="fam-invites-pending" id="fam-pending-list"></div>
         </div>
-        <button class="fam-leave" id="fam-leave-btn" onclick="leaveFamilyClick()" style="display:none;">Leave family</button>
+        <button class="fam-leave" id="fam-leave-btn" onclick="confirmDel(this,()=>leaveFamilyClick())" style="display:none;">Leave family</button>
         <p class="fam-msg" id="fam-msg"></p>
       </div>
       <div class="dt-account">
@@ -1260,7 +1260,7 @@ const CATS = ['Groceries / Household','Utilities & Bills','Dining Out','Kids / C
 const MO   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MOS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DEFAULT_PIN = '1234';
-const APP_VERSION = '2.2.3'; // 2026-05-14 — PIN screen loader bar + loading subtitle ("just a sec" reassurance)
+const APP_VERSION = '2.3.0'; // 2026-05-14 — per-user PIN, family-scoped cache, dialog cleanup
 
 /* ════════════════════════════════════════════════
    STATE
@@ -1286,6 +1286,30 @@ function _famPath(p){
   return 'families/' + _familyId + '/' + p;
 }
 window._famPath = _famPath;
+
+function _cachePrefix(){ return _familyId ? 'bgt_' + _familyId + '_' : 'bgt_'; }
+function _cacheKey(k){ return _cachePrefix() + k; }
+function _cacheSet(k,v){ try{ localStorage.setItem(_cacheKey(k),v); }catch(e){} }
+function _cacheGet(k){ try{ return localStorage.getItem(_cacheKey(k)); }catch(e){ return null; } }
+function _cacheRemove(k){ try{ localStorage.removeItem(_cacheKey(k)); }catch(e){} }
+function _isCacheMonthKey(k){
+  const p=_cachePrefix();
+  return k.startsWith(p) && /^\d{4}-\d{2}$/.test(k.slice(p.length));
+}
+function _isCachePersonalMonthKey(k){
+  const p=_cachePrefix();
+  return k.startsWith(p) && /^p[12]_\d{4}-\d{2}$/.test(k.slice(p.length));
+}
+function cleanupLegacyCache(){
+  // These pre-v2.3 keys were not family-scoped and could show stale data after switching families.
+  try{
+    Object.keys(localStorage).forEach(k=>{
+      if(k==='bgt_meta'||k==='bgt_pers_meta'||/^bgt_(p[12]_)?\d{4}-\d{2}$/.test(k)){
+        localStorage.removeItem(k);
+      }
+    });
+  }catch(e){}
+}
 // Track collapsed row indices across re-renders
 let _collapsedRecur=new Set();
 let _collapsedExp=new Set();
@@ -1327,17 +1351,69 @@ function _saveCollapsed(){
 }
 // PIN state
 let pinEntry='';
-let pinMode='unlock'; // 'unlock' | 'set-new' | 'confirm-new'
+let pinMode='unlock'; // 'unlock' | 'verify-old' | 'set-new' | 'confirm-new'
 let pinNewFirst='';
 
 /* ════════════════════════════════════════════════
    PIN LOGIC
 ════════════════════════════════════════════════ */
-function getStoredPin(){ return localStorage.getItem('bgt_pin')||DEFAULT_PIN; }
-function savePin(p){
-  localStorage.setItem('bgt_pin',p);
-  // Sync PIN to Firebase so both devices share it
-  if(window._fbSet && _familyId) window._fbSet(_famPath('budget/meta'),{pin:p});
+function getStoredPin(){
+  let pending=null;
+  try{ pending=localStorage.getItem(_pinRetryKey()); }catch(e){}
+  if(pending) return pending;
+  const mine=_familyMembers.find(m=>m.uid===(_currentUser&&_currentUser.uid));
+  return (mine&&mine.pin)||_getLocalPin()||DEFAULT_PIN;
+}
+function _getLocalPin(){
+  try{
+    const p=localStorage.getItem('bgt_pin');
+    if(!p) return null;
+    const uid=localStorage.getItem('bgt_pin_uid');
+    if(_currentUser&&uid&&uid!==_currentUser.uid) return null;
+    return p;
+  }catch(e){ return null; }
+}
+function _setLocalPin(p){
+  try{
+    localStorage.setItem('bgt_pin',p);
+    if(_currentUser) localStorage.setItem('bgt_pin_uid',_currentUser.uid);
+  }catch(e){}
+}
+function _pinRetryKey(){
+  return _currentUser ? 'bgt_pin_retry_' + _currentUser.uid : 'bgt_pin_retry';
+}
+async function retryPinSync(){
+  if(!window._fbSet||!_familyId||!_currentUser) return;
+  let p=null;
+  try{ p=localStorage.getItem(_pinRetryKey()); }catch(e){}
+  if(!p) return;
+  const ok=await window._fbSet(_famPath('members/'+_currentUser.uid),{pin:p,pinUpdatedAt:Date.now()});
+  if(ok){ try{ localStorage.removeItem(_pinRetryKey()); }catch(e){} }
+}
+async function savePin(p){
+  _setLocalPin(p);
+  if(!window._fbSet||!_familyId||!_currentUser) return false;
+  const ok=await window._fbSet(_famPath('members/'+_currentUser.uid),{pin:p,pinUpdatedAt:Date.now()});
+  if(ok){
+    try{ localStorage.removeItem(_pinRetryKey()); }catch(e){}
+    return true;
+  }
+  try{ localStorage.setItem(_pinRetryKey(),p); }catch(e){}
+  return false;
+}
+async function loadCurrentUserPin(metaPin){
+  if(!_familyId||!_currentUser||!window._fbGet) return;
+  try{
+    const member=await window._fbGet(_famPath('members/'+_currentUser.uid));
+    if(member&&member.pin){
+      _setLocalPin(member.pin);
+      return;
+    }
+    if(metaPin){
+      _setLocalPin(metaPin);
+      await savePin(metaPin);
+    }
+  }catch(e){ console.warn('PIN load/migration failed:', e); }
 }
 
 function pinKey(d){
@@ -1359,20 +1435,31 @@ function updateDots(err){
   }
 }
 async function checkPin(){
+  if((pinMode==='unlock'||pinMode==='verify-old') && _dataLoadPromise && !_dataLoaded){
+    document.getElementById('pin-subtitle').textContent='Loading your budget…';
+    try{ await _dataLoadPromise; }catch(e){ console.warn('Data load failed:', e); }
+  }
   const stored=getStoredPin();
   if(pinMode==='unlock'){
     if(pinEntry===stored){
       sessionStorage.setItem('bgt_unlocked','1');
-      // 3h: if data is still loading from boot, show a brief loading hint on the PIN screen
-      // instead of swapping to a half-rendered app
-      if(_dataLoadPromise && !_dataLoaded){
-        document.getElementById('pin-subtitle').textContent='Loading your budget…';
-        try{ await _dataLoadPromise; }catch(e){ console.warn('Data load failed:', e); }
-      }
       document.getElementById('pin-screen').classList.remove('show');
       document.getElementById('app').classList.add('unlocked');
     } else {
       shakeError('Incorrect PIN');
+    }
+  } else if(pinMode==='verify-old'){
+    if(pinEntry===stored){
+      pinEntry='';
+      updateDots(false);
+      pinMode='set-new';
+      document.getElementById('pin-subtitle').textContent='Enter a new PIN';
+      document.getElementById('pin-change-hint').textContent='Choose a 4-digit PIN. Tap "Cancel" to stop.';
+    } else {
+      pinMode='unlock';
+      document.getElementById('pin-change-hint').style.display='none';
+      document.getElementById('pin-change-btn').textContent='Change PIN';
+      shakeError('Incorrect current PIN');
     }
   } else if(pinMode==='set-new'){
     pinNewFirst=pinEntry;
@@ -1383,18 +1470,19 @@ async function checkPin(){
     pinMode='confirm-new';
   } else if(pinMode==='confirm-new'){
     if(pinEntry===pinNewFirst){
-      savePin(pinEntry);
+      const ok=await savePin(pinEntry);
       pinMode='unlock';
       pinEntry='';
       updateDots(false);
       document.getElementById('pin-subtitle').textContent='PIN updated! Enter it to continue.';
       document.getElementById('pin-change-hint').style.display='none';
       document.getElementById('pin-change-btn').textContent='Change PIN';
-      showToast('PIN updated ✓');
+      showToast(ok?'PIN updated ✓':'PIN saved locally — sync will retry');
     } else {
       shakeError("PINs don't match — try again");
       pinMode='set-new';
       pinNewFirst='';
+      document.getElementById('pin-subtitle').textContent='Enter a new PIN';
     }
   }
 }
@@ -1404,7 +1492,7 @@ function shakeError(msg){
   setTimeout(()=>{ pinEntry=''; updateDots(false); },600);
 }
 function startChangePin(){
-  if(pinMode==='set-new'||pinMode==='confirm-new'){
+  if(pinMode==='verify-old'||pinMode==='set-new'||pinMode==='confirm-new'){
     // cancel
     pinMode='unlock'; pinEntry=''; pinNewFirst='';
     updateDots(false);
@@ -1414,10 +1502,10 @@ function startChangePin(){
     document.getElementById('pin-err').textContent='';
     return;
   }
-  pinMode='set-new'; pinEntry='';
+  pinMode='verify-old'; pinEntry='';
   updateDots(false);
-  document.getElementById('pin-subtitle').textContent='Enter a new PIN';
-  document.getElementById('pin-change-hint').textContent='Choose a 4-digit PIN. Tap "Change PIN" again to cancel.';
+  document.getElementById('pin-subtitle').textContent='Enter current PIN';
+  document.getElementById('pin-change-hint').textContent='Verify your current PIN first. Tap "Cancel" to stop.';
   document.getElementById('pin-change-hint').style.display='block';
   document.getElementById('pin-change-btn').textContent='Cancel';
   document.getElementById('pin-err').textContent='';
@@ -1435,10 +1523,11 @@ function lockApp(){
 /* ════════════════════════════════════════════════
    STORAGE — Firebase + localStorage cache
    Structure:
-     budget/meta          → {name1,name2,recur,rOpen,cOpen,eOpen,pin}
-     budget/months/{key}  → month data
-     budget/personal/{who}/months/{key} → personal month data
-     budget/persMeta      → {subs, subOpen}
+     budget/meta          → {name1,name2,recur,rOpen,cOpen,eOpen}
+     months/{key}         → joint month data
+     personal_{who}/{key} → personal month data
+     persMeta/data        → {subs, subOpen}
+     members/{uid}.pin    → per-user PIN, migrated from legacy meta.pin when present
 ════════════════════════════════════════════════ */
 
 // Sync state
@@ -1451,7 +1540,7 @@ function setSyncError(){ ['sync-dot','pers-sync-dot'].forEach(id=>{const d=docum
 async function saveMeta(){
   const data={name1,name2,recur:RECUR,rOpen,cOpen,eOpen};
   // localStorage cache
-  try{ localStorage.setItem('bgt_meta',JSON.stringify(data)); }catch(e){}
+  _cacheSet('meta',JSON.stringify(data));
   // Firebase
   if(window._fbSet && _familyId){ setSyncing(); const ok=await window._fbSet(_famPath('budget/meta'),data); ok?setSynced():setSyncError(); }
 }
@@ -1470,7 +1559,7 @@ async function saveMD(){
   const k=mk(Y,M);
   const data=DB[k];
   // localStorage cache
-  try{ localStorage.setItem('bgt_'+k,JSON.stringify(data)); }catch(e){}
+  _cacheSet(k,JSON.stringify(data));
   // Firebase — serialize the entire month as a JSON string in a single field
   // This avoids any Firestore nesting/array issues
   if(window._fbSet && _familyId){
@@ -1486,15 +1575,16 @@ async function saveMD(){
 async function loadAll(){
   // First load from localStorage cache for instant display
   try{
-    const m=JSON.parse(localStorage.getItem('bgt_meta')||'{}');
+    const m=JSON.parse(_cacheGet('meta')||'{}');
     name1=m.name1||'Person 1'; name2=m.name2||'Person 2';
     RECUR=m.recur||[]; rOpen=m.rOpen!==false; cOpen=m.cOpen===true; eOpen=m.eOpen!==false;
     document.getElementById('name1').value=name1;
     document.getElementById('name2').value=name2;
   }catch(e){}
   for(const k in localStorage){
-    if(/^bgt_\d{4}-\d{2}$/.test(k)){
-      try{ DB[k.slice(4)]=JSON.parse(localStorage.getItem(k)); }catch(e){}
+    if(_isCacheMonthKey(k)){
+      const mk2=k.slice(_cachePrefix().length);
+      try{ DB[mk2]=JSON.parse(localStorage.getItem(k)); }catch(e){}
     }
   }
 
@@ -1505,10 +1595,10 @@ async function loadAll(){
       if(meta){
         name1=meta.name1||'Person 1'; name2=meta.name2||'Person 2';
         RECUR=meta.recur||[]; rOpen=meta.rOpen!==false; cOpen=meta.cOpen===true; eOpen=meta.eOpen!==false;
-        if(meta.pin) localStorage.setItem('bgt_pin', meta.pin);
+        await loadCurrentUserPin(meta.pin);
         document.getElementById('name1').value=name1;
         document.getElementById('name2').value=name2;
-        localStorage.setItem('bgt_meta',JSON.stringify(meta));
+        _cacheSet('meta',JSON.stringify({name1,name2,recur:RECUR,rOpen,cOpen,eOpen}));
       }
       // Load months via individual keys we know about
       const allMonthKeys=[...new Set([...Object.keys(DB), ...Array.from({length:24},(_,i)=>{
@@ -1517,7 +1607,7 @@ async function loadAll(){
       })])];
       await Promise.all(allMonthKeys.map(async k=>{
         const doc=await window._fbGet(_famPath('months/'+k));
-        if(doc&&doc.data){ try{ DB[k]=JSON.parse(doc.data); localStorage.setItem('bgt_'+k,doc.data); }catch(e){} }
+        if(doc&&doc.data){ try{ DB[k]=JSON.parse(doc.data); _cacheSet(k,doc.data); }catch(e){} }
       }));
     }catch(e){ console.warn('Firebase load failed, using cache',e); }
   }
@@ -1536,8 +1626,7 @@ function startListeners(){
     const prev=JSON.stringify({name1,name2,recur:RECUR});
     name1=data.name1||'Person 1'; name2=data.name2||'Person 2';
     RECUR=data.recur||[]; rOpen=data.rOpen!==false; cOpen=data.cOpen===true; eOpen=data.eOpen!==false;
-    if(data.pin) localStorage.setItem('bgt_pin',data.pin);
-    localStorage.setItem('bgt_meta',JSON.stringify(data));
+    _cacheSet('meta',JSON.stringify({name1,name2,recur:RECUR,rOpen,cOpen,eOpen}));
     document.getElementById('name1').value=name1;
     document.getElementById('name2').value=name2;
     render(); showToast('↻ Synced');
@@ -1551,14 +1640,19 @@ function startListeners(){
     if(!data) return;
     PSUBS=data.subs||{'1':[],'2':[]};
     persSubOpen=data.subOpen||{'1':true,'2':true};
-    localStorage.setItem('bgt_pers_meta',JSON.stringify({subs:PSUBS,subOpen:persSubOpen}));
+    _cacheSet('pers_meta',JSON.stringify({subs:PSUBS,subOpen:persSubOpen}));
   });
 
   // Listen to family members (live list)
   if(window._fbListenCollection){
     _membersUnsub=window._fbListenCollection(_famPath('members'), members=>{
-      _familyMembers = members.map(m => ({uid:m.id, email:m.email, role:m.role||'member', addedAt:m.addedAt}));
+      _familyMembers = members.map(m => ({uid:m.id, email:m.email, role:m.role||'member', addedAt:m.addedAt, pin:m.pin}));
       _isOwner = !!_familyMembers.find(m => m.uid === (_currentUser && _currentUser.uid) && m.role === 'owner');
+      const mine=_familyMembers.find(m=>m.uid===(_currentUser&&_currentUser.uid));
+      let pendingPin=null;
+      try{ pendingPin=localStorage.getItem(_pinRetryKey()); }catch(e){}
+      if(mine&&mine.pin&&!pendingPin) _setLocalPin(mine.pin);
+      retryPinSync();
       renderFamilySection();
       // If owner, also refresh pending invites since visibility depends on ownership
       if(_isOwner) loadPendingInvites();
@@ -1585,7 +1679,7 @@ function listenCurrentMonth(){
     try{
       const parsed=JSON.parse(data.data);
       DB[k]=parsed;
-      localStorage.setItem('bgt_'+k,data.data);
+      _cacheSet(k,data.data);
       render(); // always re-render on any incoming change
     }catch(e){}
   });
@@ -2662,13 +2756,14 @@ let persSubOpen = {'1':true,'2':true};
 async function loadPersonal(){
   // Load from cache first
   try{
-    const m=JSON.parse(localStorage.getItem('bgt_pers_meta')||'{}');
+    const m=JSON.parse(_cacheGet('pers_meta')||'{}');
     PSUBS = m.subs || {'1':[],'2':[]};
     persSubOpen = m.subOpen || {'1':true,'2':true};
   }catch(e){}
   for(const k in localStorage){
-    if(/^bgt_p[12]_\d{4}-\d{2}$/.test(k)){
-      const who=k[5]; const mk2=k.slice(7);
+    if(_isCachePersonalMonthKey(k)){
+      const raw=k.slice(_cachePrefix().length);
+      const who=raw[1]; const mk2=raw.slice(3);
       try{ PDB[who][mk2]=JSON.parse(localStorage.getItem(k)); }catch(e){}
     }
   }
@@ -2677,7 +2772,7 @@ async function loadPersonal(){
     try{
       const pm=await window._fbGet(_famPath('persMeta/data'));
       if(pm){ PSUBS=pm.subs||{'1':[],'2':[]}; persSubOpen=pm.subOpen||{'1':true,'2':true};
-        localStorage.setItem('bgt_pers_meta',JSON.stringify({subs:PSUBS,subOpen:persSubOpen})); }
+        _cacheSet('pers_meta',JSON.stringify({subs:PSUBS,subOpen:persSubOpen})); }
       // Load personal months for both people, last 24 months
       for(const who of ['1','2']){
         const keys=Array.from({length:24},(_,i)=>{
@@ -2686,7 +2781,7 @@ async function loadPersonal(){
         });
         await Promise.all(keys.map(async k=>{
           const doc=await window._fbGet(_famPath('personal_'+who+'/'+k));
-          if(doc&&doc.data){ try{ PDB[who][k]=JSON.parse(doc.data); localStorage.setItem('bgt_p'+who+'_'+k,doc.data); }catch(e){} }
+          if(doc&&doc.data){ try{ PDB[who][k]=JSON.parse(doc.data); _cacheSet('p'+who+'_'+k,doc.data); }catch(e){} }
         }));
       }
     }catch(e){ console.warn('Personal Firebase load failed',e); }
@@ -2694,7 +2789,7 @@ async function loadPersonal(){
 }
 async function savePMeta(){
   const data={subs:PSUBS,subOpen:persSubOpen};
-  try{ localStorage.setItem('bgt_pers_meta',JSON.stringify(data)); }catch(e){}
+  _cacheSet('pers_meta',JSON.stringify(data));
   if(window._fbSet && _familyId){ setSyncing(); const ok=await window._fbSet(_famPath('persMeta/data'),data); ok?setSynced():setSyncError(); }
 }
 function getPMD(who,y,m){
@@ -2710,7 +2805,7 @@ async function savePMD(who){
   // NOTE: uses global PY/PM — only safe when called from the currently viewed personal month context
   const k=mk(PY,PM);
   const data=PDB[who][k];
-  try{ localStorage.setItem('bgt_p'+who+'_'+k, JSON.stringify(data)); }catch(e){}
+  _cacheSet('p'+who+'_'+k, JSON.stringify(data));
   if(window._fbSet && _familyId){ setSyncing(); const ok=await window._fbSet(_famPath('personal_'+who+'/'+k),{data:JSON.stringify(data)}); ok?setSynced():setSyncError(); }
 }
 // Personal months use the same key format as joint months
@@ -2809,7 +2904,7 @@ function listenPersMonth(){
     try{
       const parsed=JSON.parse(data.data);
       PDB[persWho][k]=parsed;
-      localStorage.setItem('bgt_p'+persWho+'_'+k,data.data);
+      _cacheSet('p'+persWho+'_'+k,data.data);
       renderPersonal();
     }catch(e){}
   });
@@ -3439,23 +3534,20 @@ function exportCSV(){
   showToast('CSV exported ✓');
 }
 
+function confirmImportClick(btn){
+  confirmDel(btn,()=>document.getElementById('import-file').click());
+}
+
 async function importJSON(input){
   const file = input.files[0];
   if(!file) return;
-  const proceed = confirm(
-    'Import will REPLACE all current data with the contents of this file.\n\n' +
-    'Your current data will be overwritten on this device AND in Firebase (synced to all devices).\n\n' +
-    'Tip: Export a JSON backup first if you want a safety net.\n\n' +
-    'Continue with import?'
-  );
-  if(!proceed){ input.value=''; return; }
 
   try {
     const text = await file.text();
     const data = JSON.parse(text);
 
     if(!data.meta || !data.months){
-      alert('This file does not look like a Family Budget backup. Import cancelled.');
+      showToast('Import cancelled: not a Family Budget backup');
       input.value='';
       return;
     }
@@ -3501,12 +3593,12 @@ async function importJSON(input){
 
     // Refresh localStorage cache
     try{
-      localStorage.setItem('bgt_meta', JSON.stringify({name1,name2,recur:RECUR,rOpen,cOpen,eOpen}));
-      localStorage.setItem('bgt_pers_meta', JSON.stringify({subs:PSUBS,subOpen:persSubOpen}));
-      Object.keys(DB).forEach(k => localStorage.setItem('bgt_'+k, JSON.stringify(DB[k])));
+      _cacheSet('meta', JSON.stringify({name1,name2,recur:RECUR,rOpen,cOpen,eOpen}));
+      _cacheSet('pers_meta', JSON.stringify({subs:PSUBS,subOpen:persSubOpen}));
+      Object.keys(DB).forEach(k => _cacheSet(k, JSON.stringify(DB[k])));
       ['1','2'].forEach(who => {
         Object.keys(PDB[who]||{}).forEach(k => {
-          localStorage.setItem('bgt_p'+who+'_'+k, JSON.stringify(PDB[who][k]));
+          _cacheSet('p'+who+'_'+k, JSON.stringify(PDB[who][k]));
         });
       });
     }catch(e){ console.warn('localStorage cache refresh failed', e); }
@@ -3515,7 +3607,7 @@ async function importJSON(input){
     showToast('Import complete ✓');
   } catch(err) {
     console.error('Import failed:', err);
-    alert('Import failed: ' + err.message);
+    showToast('Import failed: ' + err.message);
   } finally {
     input.value='';
   }
@@ -3721,7 +3813,7 @@ async function authCompleteFromUrl(){
   try{ email=localStorage.getItem('bgt_auth_email'); }catch(e){}
   if(!email){
     // Different device — stash the link, hand off to confirm-email stage (3d).
-    // No prompt() — proper in-screen UI instead.
+    // Use proper in-screen UI instead of a browser prompt.
     _pendingAuthLink = window.location.href;
     authStageConfirmEmail();
     return false;
@@ -3792,7 +3884,8 @@ async function authCreateFamilyClick(){
   try{
     const famId=await createFamilyForUser(_currentUser.uid, _currentUser.email);
     _familyId=famId;
-    try{ localStorage.setItem('bgt_family_id', famId); }catch(e){}
+    try{ localStorage.setItem('bgt_family_id', famId); localStorage.setItem('bgt_uid', _currentUser.uid); }catch(e){}
+    cleanupLegacyCache();
     await proceedToApp();
   }catch(e){
     console.error('Create family failed:', e);
@@ -3809,13 +3902,8 @@ async function signOutClick(){
   if(_invitesUnsub){ try{ _invitesUnsub(); }catch(e){} _invitesUnsub=null; }
   // Clear cached state
   try{
-    localStorage.removeItem('bgt_family_id');
-    localStorage.removeItem('bgt_auth_email');
-    localStorage.removeItem('bgt_meta');
-    localStorage.removeItem('bgt_pers_meta');
-    localStorage.removeItem('bgt_pin');
     Object.keys(localStorage).forEach(k=>{
-      if(/^bgt_(p[12]_)?\d{4}-\d{2}$/.test(k)) localStorage.removeItem(k);
+      if(k.startsWith('bgt_')) localStorage.removeItem(k);
     });
     sessionStorage.removeItem('bgt_unlocked');
   }catch(e){}
@@ -3928,7 +4016,7 @@ async function handleAuthState(user){
     _familyId=null;
     _familyMembers=[];
     _isOwner=false;
-    try{ localStorage.removeItem('bgt_family_id'); }catch(e){}
+    try{ localStorage.removeItem('bgt_family_id'); localStorage.removeItem('bgt_uid'); }catch(e){}
     const ae=document.getElementById('account-email'); if(ae) ae.textContent='—';
     showScreen('auth');
     authStageInput();
@@ -3937,13 +4025,17 @@ async function handleAuthState(user){
   _currentUser=user;
   // Try cached family ID first (offline-friendly)
   let famId=null;
-  try{ famId=localStorage.getItem('bgt_family_id')||null; }catch(e){}
+  try{
+    const cachedUid=localStorage.getItem('bgt_uid')||null;
+    famId=cachedUid===user.uid ? (localStorage.getItem('bgt_family_id')||null) : null;
+  }catch(e){}
   if(!famId){
     try{ famId=await lookupFamily(user.uid); }catch(e){ console.warn('Family lookup:', e); }
   }
   if(famId){
     _familyId=famId;
-    try{ localStorage.setItem('bgt_family_id', famId); }catch(e){}
+    try{ localStorage.setItem('bgt_family_id', famId); localStorage.setItem('bgt_uid', user.uid); }catch(e){}
+    cleanupLegacyCache();
     await proceedToApp();
     return;
   }
@@ -3953,7 +4045,8 @@ async function handleAuthState(user){
       const accepted = await acceptPendingInviteIfAny(user.uid, user.email);
       if(accepted){
         _familyId = accepted;
-        try{ localStorage.setItem('bgt_family_id', accepted); }catch(e){}
+        try{ localStorage.setItem('bgt_family_id', accepted); localStorage.setItem('bgt_uid', user.uid); }catch(e){}
+        cleanupLegacyCache();
         await proceedToApp();
         return;
       }
@@ -4140,7 +4233,6 @@ async function removeMember(uid, email){
 async function leaveFamilyClick(){
   _famSetMsg('');
   if(_isOwner){ _famSetMsg("Owners can't leave. Transfer ownership first (not yet implemented).", 'err'); return; }
-  if(!confirm('Leave this family? Your access to all shared data will be removed. This cannot be undone from within the app.')) return;
   try{
     // Remove our own member doc
     const memOk = await window._fbDelete('families/'+_familyId+'/members/'+_currentUser.uid);
@@ -4168,7 +4260,7 @@ document.getElementById('nextMonth').addEventListener('click',()=>changeMonth(1)
 
   // Best-effort cached display name (will be overridden after family resolved)
   try{
-    const m=JSON.parse(localStorage.getItem('bgt_meta')||'{}');
+    const m=JSON.parse(_cacheGet('meta')||'{}');
     name1=m.name1||'Person 1'; name2=m.name2||'Person 2';
     RECUR=m.recur||[];
     document.getElementById('name1').value=name1;
