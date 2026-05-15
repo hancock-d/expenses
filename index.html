@@ -1264,7 +1264,7 @@ const CATS = ['Groceries / Household','Utilities & Bills','Dining Out','Kids / C
 const MO   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MOS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DEFAULT_PIN = '1234';
-const APP_VERSION = '2.3.5'; // 2026-05-14 — recurring density + invite hardening
+const APP_VERSION = '2.3.6'; // 2026-05-14 — family ID path guard
 
 /* ════════════════════════════════════════════════
    STATE
@@ -1286,11 +1286,19 @@ let _isOwner = false;       // true if _currentUser is owner of _familyId
 // remain untouched in Firestore — locked at rules level. Migration is Session 2.
 function _famPath(p){
   if(!_familyId) throw new Error('No family ID set; cannot access family data');
+  if(!isSafeFamilyId(_familyId)) throw new Error('Invalid family ID; cannot access family data');
   return 'families/' + _familyId + '/' + p;
 }
 window._famPath = _famPath;
 
-function _cachePrefix(){ return _familyId ? 'bgt_' + _familyId + '_' : 'bgt_'; }
+function isSafeFamilyId(fid){
+  return typeof fid === 'string' && /^fam_[a-z0-9]{12}$/.test(fid);
+}
+function _cachePrefix(){
+  if(!_familyId) return 'bgt_';
+  if(!isSafeFamilyId(_familyId)) throw new Error('Invalid family ID; cannot build cache key');
+  return 'bgt_' + _familyId + '_';
+}
 function _cacheKey(k){ return _cachePrefix() + k; }
 function _cacheSet(k,v){ try{ localStorage.setItem(_cacheKey(k),v); }catch(e){} }
 function _cacheGet(k){ try{ return localStorage.getItem(_cacheKey(k)); }catch(e){ return null; } }
@@ -3473,13 +3481,14 @@ function runDevTests(){
     const jsAttr=escJsAttr("o'hara\\x\"<tag>");
     assert('escJsAttr protects inline handler args', jsAttr.includes("\\'")&&jsAttr.includes('\\\\')&&jsAttr.includes('&quot;')&&jsAttr.includes('&lt;tag&gt;'), jsAttr);
     assert('invite email rejects path separators', isValidInviteEmail('test@example.com')&&!isValidInviteEmail('bad/name@example.com'));
+    assert('family id accepts only app-generated ids', isSafeFamilyId('fam_3g9178wnsrg2')&&!isSafeFamilyId('fam_bad/path'));
     assert('chargeDate clamps month end', chargeDate(31,2026,1)==='2026-02-28');
     const weekly=getRecurDates({frequency:'weekly',anchorDate:'2026-04-01'},2026,3);
     assert('weekly recurrence dates', weekly.length===5&&weekly[0]==='2026-04-01'&&weekly[4]==='2026-04-29', weekly.join(','));
     const biweekly=getRecurDates({frequency:'biweekly',anchorDate:'2026-04-03'},2026,3);
     assert('biweekly recurrence dates', biweekly.length===2&&biweekly[0]==='2026-04-03'&&biweekly[1]==='2026-04-17', biweekly.join(','));
-    _familyId='fam_test';
-    assert('family cache key prefixes', _cacheKey('meta')==='bgt_fam_test_meta');
+    _familyId='fam_3g9178wnsrg2';
+    assert('family cache key prefixes', _cacheKey('meta')==='bgt_fam_3g9178wnsrg2_meta');
     Y=2026; M=3; name1='Person 1'; name2='Person 2';
     RECUR=[{id:'r1',amount:'40'}];
     DB={'2026-04':{expenses:[
@@ -3918,11 +3927,12 @@ function genFamilyId(){
 async function lookupFamily(uid){
   if(!window._fbGet) return null;
   const data=await window._fbGet('userFamilies/'+uid);
-  return (data&&data.familyId)||null;
+  const fid=(data&&data.familyId)||null;
+  return isSafeFamilyId(fid) ? fid : null;
 }
 
 async function verifyFamilyMembership(fid, uid){
-  if(!window._fbGet||!fid||!uid) return false;
+  if(!window._fbGet||!isSafeFamilyId(fid)||!uid) return false;
   const member=await window._fbGet('families/'+fid+'/members/'+uid);
   return !!member;
 }
@@ -4120,7 +4130,9 @@ async function handleAuthState(user){
   let famId=null;
   try{
     const cachedUid=localStorage.getItem('bgt_uid')||null;
-    famId=cachedUid===user.uid ? (localStorage.getItem('bgt_family_id')||null) : null;
+    const cachedFamId=cachedUid===user.uid ? (localStorage.getItem('bgt_family_id')||null) : null;
+    famId=isSafeFamilyId(cachedFamId) ? cachedFamId : null;
+    if(cachedFamId && !famId) localStorage.removeItem('bgt_family_id');
   }catch(e){}
   if(!famId){
     try{ famId=await lookupFamily(user.uid); }catch(e){ console.warn('Family lookup:', e); }
@@ -4176,6 +4188,7 @@ async function acceptPendingInviteIfAny(uid, email){
   const parts = invite.path.split('/');
   if(parts.length !== 4 || parts[0] !== 'families' || parts[2] !== 'pendingInvites') return null;
   const fid = parts[1];
+  if(!isSafeFamilyId(fid)) return null;
   // 1) Create self-membership doc (rules allow because request.auth.uid == uid)
   const memOk = await window._fbSet('families/'+fid+'/members/'+uid, {
     email: email, role: 'member', addedAt: Date.now()
