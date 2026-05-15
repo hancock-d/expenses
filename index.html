@@ -1058,6 +1058,7 @@ input[placeholder="Optional note…"]:focus {
         <button class="dt-btn" onclick="exportJSON()">⬇ Export JSON</button>
         <button class="dt-btn" onclick="exportCSV()">⬇ Export CSV</button>
         <button class="dt-btn dt-import" onclick="confirmImportClick(this)">⬆ Import JSON</button>
+        <button class="dt-btn" id="dev-test-btn" onclick="runDevTests()" style="display:none;">Run checks</button>
         <input type="file" id="import-file" accept=".json,application/json" style="display:none" onchange="importJSON(this)">
       </div>
       <div class="dt-family">
@@ -1261,7 +1262,7 @@ const CATS = ['Groceries / Household','Utilities & Bills','Dining Out','Kids / C
 const MO   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MOS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DEFAULT_PIN = '1234';
-const APP_VERSION = '2.3.2'; // 2026-05-14 — recurring typography polish + dev test harness
+const APP_VERSION = '2.3.3'; // 2026-05-14 — visible dev checks + skipped recurring test
 
 /* ════════════════════════════════════════════════
    STATE
@@ -3471,6 +3472,9 @@ function runDevTests(){
     const r=calcMonth(2026,3);
     assert('calcMonth paid totals', approx(r.paid1,140)&&approx(r.paid2,50), JSON.stringify(r));
     assert('calcMonth credit nets', approx(r.net1,115)&&approx(r.net2,45)&&approx(r.balance,70), JSON.stringify(r));
+    DB['2026-04'].skips={r1:true};
+    const skipped=calcMonth(2026,3);
+    assert('calcMonth excludes skipped recurring', approx(skipped.paid1,100)&&approx(skipped.net1,75)&&approx(skipped.balance,30), JSON.stringify(skipped));
     console.table(results);
     showToast('Dev tests passed');
     return true;
@@ -4343,7 +4347,10 @@ document.getElementById('nextMonth').addEventListener('click',()=>changeMonth(1)
   const n=new Date(); Y=n.getFullYear(); M=n.getMonth();
   try{
     const params=new URLSearchParams(window.location.search);
-    if(params.has('test')||window.location.hash==='#test') runDevTests();
+    const devTestEnabled=params.has('test')||window.location.hash==='#test';
+    const testBtn=document.getElementById('dev-test-btn');
+    if(testBtn) testBtn.style.display=devTestEnabled?'inline-flex':'none';
+    if(devTestEnabled) runDevTests();
   }catch(e){ console.warn('Dev test bootstrap failed:', e); }
 
   // Wait for Firebase module to register globals
