@@ -385,13 +385,15 @@ main{max-width:1100px;margin:0 auto;padding:18px 14px calc(18px + var(--safe-bot
 .rzone .ztag{border:1px solid var(--rb);color:var(--rv);}
 
 /* Collapsible recurring rows — two-row approach */
-.rsummary-row td{padding:6px 10px;border-bottom:none;}
+.rsummary-row td{padding:6px 10px;border-bottom:1px solid rgba(197,184,232,.35);}
+.rsummary-row>td>div{gap:4px!important;}
 .rsummary-row:hover td{background:rgba(107,79,187,.03);}
 .rdetail-row{border-bottom:1px solid rgba(197,184,232,.35);}
 .rdetail-row.r-hidden{display:none!important;}
 .rdetail-row.r-hidden+.rsummary-row,.rsummary-row:first-child{border-top:none;}
 .rsum{font-family:'DM Mono',monospace;font-size:.78rem;color:var(--slate);}
-.rname-edit{font-weight:500;font-size:.82rem;padding:4px 8px;font-family:'DM Sans',sans-serif;color:var(--ink);min-width:60px;flex:1;outline:none;border:1px solid var(--border);border-radius:5px;background:var(--lg);}
+.rname-edit{font-weight:500;font-size:.82rem;padding:1px 0;font-family:'DM Sans',sans-serif;color:var(--ink);min-width:60px;flex:1;outline:none;border:1px solid transparent;border-radius:4px;background:transparent;line-height:1.35;}
+.rname-edit:hover{border-color:var(--rb);background:white;padding-left:6px;padding-right:6px;}
 .rname-edit:focus{border-color:var(--rv);background:white;}
 .rname-edit:empty::before{content:attr(data-placeholder);color:var(--slate);opacity:.5;font-style:italic;}
 @media(max-width:640px){
@@ -1262,7 +1264,7 @@ const CATS = ['Groceries / Household','Utilities & Bills','Dining Out','Kids / C
 const MO   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MOS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DEFAULT_PIN = '1234';
-const APP_VERSION = '2.3.3'; // 2026-05-14 — visible dev checks + skipped recurring test
+const APP_VERSION = '2.3.4'; // 2026-05-14 — recurring row density match
 
 /* ════════════════════════════════════════════════
    STATE
@@ -2016,7 +2018,7 @@ function renderRecur(){
     // Summary row
     const sr=document.createElement('tr');
     sr.className='rsummary-row'+(rowClass?' '+rowClass:'');
-    sr.innerHTML=`<td colspan="7" style="padding:8px 10px;"><div style="display:flex;align-items:center;gap:6px;">
+    sr.innerHTML=`<td colspan="7"><div style="display:flex;align-items:center;gap:4px;">
       <div class="reorder-arrows">
         <button class="reorder-btn" onclick="reorderRecur(${i},-1)" ${i===0?'disabled style="visibility:hidden"':''} title="Move up">▲</button>
         <button class="reorder-btn" onclick="reorderRecur(${i},1)" ${i===RECUR.length-1?'disabled style="visibility:hidden"':''} title="Move down">▼</button>
@@ -2968,7 +2970,7 @@ function renderPersSubs(who){
     // Summary row
     const sr=document.createElement('tr');
     sr.className='rsummary-row'+(rowClass?' '+rowClass:'');
-    sr.innerHTML=`<td colspan="6" style="padding:8px 10px;"><div style="display:flex;align-items:center;gap:6px;">
+    sr.innerHTML=`<td colspan="6"><div style="display:flex;align-items:center;gap:4px;">
       <div class="reorder-arrows">
         <button class="reorder-btn" onclick="reorderPSub('${who}',${i},-1)" ${i===0?'disabled style="visibility:hidden"':''} title="Move up">▲</button>
         <button class="reorder-btn" onclick="reorderPSub('${who}',${i},1)" ${i===(PSUBS[who]||[]).length-1?'disabled style="visibility:hidden"':''} title="Move down">▼</button>
