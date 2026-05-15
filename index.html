@@ -1264,7 +1264,7 @@ const CATS = ['Groceries / Household','Utilities & Bills','Dining Out','Kids / C
 const MO   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MOS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DEFAULT_PIN = '1234';
-const APP_VERSION = '2.3.6'; // 2026-05-14 — family ID path guard
+const APP_VERSION = '2.3.7'; // 2026-05-14 — family action event delegation
 
 /* ════════════════════════════════════════════════
    STATE
@@ -3428,15 +3428,6 @@ function delPersCredit(who,i){
 function fmt(v){ return '$'+(parseFloat(v)||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
 function ordinal(n){ const s=['th','st','nd','rd']; const v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]); }
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function escJsAttr(s){
-  return esc(String(s)
-    .replace(/\\/g,'\\\\')
-    .replace(/'/g,"\\'")
-    .replace(/\r/g,'\\r')
-    .replace(/\n/g,'\\n')
-    .replace(/\u2028/g,'\\u2028')
-    .replace(/\u2029/g,'\\u2029'));
-}
 function isValidInviteEmail(email){
   return typeof email === 'string' &&
     email.length > 0 &&
@@ -3478,8 +3469,6 @@ function runDevTests(){
     assert('fmt formats money', fmt(1234.5)==='$1,234.50');
     assert('ordinal suffixes', ordinal(1)==='1st'&&ordinal(2)==='2nd'&&ordinal(3)==='3rd'&&ordinal(11)==='11th');
     assert('mk zero-pads months', mk(2026,0)==='2026-01');
-    const jsAttr=escJsAttr("o'hara\\x\"<tag>");
-    assert('escJsAttr protects inline handler args', jsAttr.includes("\\'")&&jsAttr.includes('\\\\')&&jsAttr.includes('&quot;')&&jsAttr.includes('&lt;tag&gt;'), jsAttr);
     assert('invite email rejects path separators', isValidInviteEmail('test@example.com')&&!isValidInviteEmail('bad/name@example.com'));
     assert('family id accepts only app-generated ids', isSafeFamilyId('fam_3g9178wnsrg2')&&!isSafeFamilyId('fam_bad/path'));
     assert('chargeDate clamps month end', chargeDate(31,2026,1)==='2026-02-28');
@@ -4239,7 +4228,7 @@ function renderFamilySection(){
         <span class="fam-member-email">${esc(m.email||'(unknown)')}${isYou?' (you)':''}</span>
         <span class="fam-member-role ${m.role==='owner'?'owner':''}">${esc(m.role||'member')}</span>
       </div>
-      ${canRemove?`<button class="fam-member-action" onclick="confirmDel(this,()=>removeMember('${escJsAttr(m.uid)}','${escJsAttr(m.email||'')}'))">Remove</button>`:''}
+      ${canRemove?`<button class="fam-member-action fam-remove-member" data-uid="${esc(m.uid)}" data-email="${esc(m.email||'')}">Remove</button>`:''}
     </div>`;
   }).join('');
   // Invite section + pending list — owner only
@@ -4258,12 +4247,28 @@ function renderFamilySection(){
             <span class="fam-pending-email">${esc(inv.email||inv.id||'')}</span>
             <span class="fam-pending-meta">Pending${when?' · sent '+when:''}</span>
           </div>
-          <button class="fam-member-action" onclick="confirmDel(this,()=>revokeInvite('${escJsAttr(inv.id)}'))">Revoke</button>
+          <button class="fam-member-action fam-revoke-invite" data-invite-id="${esc(inv.id)}">Revoke</button>
         </div>`;
       }).join('');
     }
   }
 }
+
+document.addEventListener('click', e=>{
+  const target=e.target;
+  if(!(target instanceof Element)) return;
+  const removeBtn=target.closest('.fam-remove-member');
+  if(removeBtn){
+    e.preventDefault();
+    confirmDel(removeBtn,()=>removeMember(removeBtn.dataset.uid||'', removeBtn.dataset.email||''));
+    return;
+  }
+  const revokeBtn=target.closest('.fam-revoke-invite');
+  if(revokeBtn){
+    e.preventDefault();
+    confirmDel(revokeBtn,()=>revokeInvite(revokeBtn.dataset.inviteId||''));
+  }
+});
 
 function _famSetMsg(text, kind){
   const el = document.getElementById('fam-msg');
