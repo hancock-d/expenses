@@ -415,6 +415,12 @@ main{max-width:1100px;margin:0 auto;padding:18px 14px calc(18px + var(--safe-bot
 .ec-toggle:hover{background:var(--border);}
 
 .rtable{width:100%;border-collapse:collapse;min-width:1200px;}
+.rtable thead,.etable thead,.ctable thead{display:none;}
+@media(min-width:641px){
+  .rtable:has(tbody tr.rdetail-row:not(.r-hidden)) thead,
+  .etable:has(tbody tr.ec-detail-row:not(.ec-hidden)) thead,
+  .ctable:has(tbody tr.ec-detail-row:not(.ec-hidden)) thead{display:table-header-group;}
+}
 .rtable thead th{font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--rv);padding:7px 10px;text-align:left;border-bottom:1px solid var(--rb);background:rgba(107,79,187,.05);white-space:nowrap;}
 .rtable tbody tr{border-bottom:1px solid rgba(197,184,232,.35);}
 .rtable tbody tr:last-child{border-bottom:none;}
@@ -1268,7 +1274,7 @@ const CATS = ['Groceries / Household','Utilities & Bills','Dining Out','Kids / C
 const MO   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MOS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DEFAULT_PIN = '1234';
-const APP_VERSION = '2.3.8'; // 2026-05-15 — inline expense descriptions
+const APP_VERSION = '2.3.9'; // 2026-05-15 — hide idle detail headers
 
 /* ════════════════════════════════════════════════
    STATE
