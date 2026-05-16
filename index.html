@@ -415,13 +415,11 @@ main{max-width:1100px;margin:0 auto;padding:18px 14px calc(18px + var(--safe-bot
 .ec-toggle{background:var(--lg);border:1px solid var(--border);font-size:.65rem;color:var(--slate);cursor:pointer;padding:6px 8px;border-radius:4px;vertical-align:middle;flex-shrink:0;touch-action:manipulation;line-height:1;}
 .ec-toggle:hover{background:var(--border);}
 
-.rtable{width:100%;border-collapse:collapse;min-width:1200px;}
-.rtable:not(:has(tbody tr.rdetail-row:not(.r-hidden))){min-width:0;}
-.rtable:not(:has(tbody tr.rdetail-row:not(.r-hidden))) .rsummary-row .rname-edit{min-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.rtable:not(:has(tbody tr.rdetail-row:not(.r-hidden))) .rsummary-row .ec-note{flex:0 1 clamp(80px,22vw,220px);min-width:0;max-width:none;margin-left:6px;}
+.rtable{width:100%;border-collapse:collapse;min-width:0;table-layout:fixed;}
+.rtable .rsummary-row .rname-edit{min-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rtable .rsummary-row .ec-note{flex:0 1 clamp(80px,22vw,220px);min-width:0;max-width:none;margin-left:6px;}
 .rtable thead,.etable thead,.ctable thead{display:none;}
 @media(min-width:641px){
-  .rtable:has(tbody tr.rdetail-row:not(.r-hidden)) thead,
   .etable:has(tbody tr.ec-detail-row:not(.ec-hidden)) thead,
   .ctable:has(tbody tr.ec-detail-row:not(.ec-hidden)) thead{display:table-header-group;}
 }
@@ -433,6 +431,25 @@ main{max-width:1100px;margin:0 auto;padding:18px 14px calc(18px + var(--safe-bot
 .rtable td input,.rtable td select{font-family:'DM Sans',sans-serif;font-size:.82rem;border:1px solid transparent;border-radius:5px;padding:3px 6px;background:transparent;color:var(--ink);width:100%;min-width:0;}
 .rtable td input:focus,.rtable td select:focus{outline:none;border-color:var(--rv);background:white;}
 .rtable td input:hover,.rtable td select:hover{border-color:var(--rb);background:white;}
+.recur-detail-cell{padding:0!important;border:none!important;}
+.recur-detail-panel{display:grid;grid-template-columns:minmax(170px,.9fr) minmax(210px,1fr) minmax(260px,1.25fr) minmax(190px,.95fr);gap:12px 16px;padding:12px 14px;background:rgba(107,79,187,.045);border-bottom:1px solid rgba(197,184,232,.45);}
+.recur-detail-group{display:flex;flex-direction:column;gap:8px;min-width:0;}
+.recur-field{display:flex;flex-direction:column;gap:3px;min-width:0;}
+.recur-field label,.recur-inline-label{font-size:.55rem;font-weight:700;color:var(--rv);text-transform:uppercase;letter-spacing:.06em;}
+.recur-field.credit label{color:var(--cv);}
+.recur-inline{display:flex;align-items:center;gap:6px;min-width:0;flex-wrap:wrap;}
+.recur-inline label,.recur-inline-label{flex:0 0 auto;}
+.recur-inline select,.recur-inline input{flex:1 1 90px;}
+.recur-subtle{font-size:.65rem;color:var(--slate);line-height:1.3;}
+.recur-months{display:flex;flex-wrap:wrap;gap:3px;margin-top:3px;}
+.recur-note-input{min-height:72px;resize:vertical;}
+.recur-field.rnum input{font-family:'DM Mono',monospace;text-align:right;}
+@media(max-width:980px){
+  .recur-detail-panel{grid-template-columns:repeat(2,minmax(0,1fr));}
+}
+@media(max-width:640px){
+  .recur-detail-panel{grid-template-columns:1fr;padding:10px 12px;gap:10px;}
+}
 td.rnum input{font-family:'DM Mono',monospace;text-align:right;}
 .ri{opacity:.38;}
 .ri td:first-child,.ri td:last-child{opacity:1;}
@@ -577,12 +594,7 @@ td.anum input{font-family:'DM Mono',monospace;font-weight:500;text-align:left;}
   .rtable tbody tr.rsummary-row td{display:block;padding:0;border:none;}
   /* Detail rows — stacked grid
      td order: 1=name(colspan2) 2=paidby+cat 3=cost 4=details 5=days-covered 6=notes+delete */
-  .rtable tbody tr.rdetail-row{
-    display:grid;
-    grid-template-columns:1fr;
-    gap:5px 0;padding:10px 12px;
-    border-bottom:2px solid var(--rb)!important;
-  }
+  .rtable tbody tr.rdetail-row{display:table-row;border-bottom:2px solid var(--rb)!important;}
   .rtable tbody td{padding:2px 0;border:none;min-width:0;}
   /* Coverage dropdowns inline */
   .rtable .cov-wrap{display:flex;flex-wrap:nowrap;align-items:center;gap:4px;}
@@ -622,11 +634,7 @@ td.anum input{font-family:'DM Mono',monospace;font-weight:500;text-align:left;}
      Personal etable has 7 tds: 1=date 2=desc 3=cat 4=payment 5=amount 6=notes 7=delete */
   #pers-overlay .rtable tbody tr.rsummary-row{display:block;padding:8px 12px;border-bottom:1px solid var(--rb);}
   #pers-overlay .rtable tbody tr.rsummary-row td{display:block;padding:0;border:none;}
-  #pers-overlay .rtable tbody tr.rdetail-row{
-    display:grid;
-    grid-template-columns:1fr;
-    gap:5px 0;padding:10px 12px;
-  }
+  #pers-overlay .rtable tbody tr.rdetail-row{display:table-row;}
 
   #pers-overlay .etable tbody tr.ec-summary-row{display:block;padding:8px 12px;border-bottom:1px solid var(--border);}
   #pers-overlay .etable tbody tr.ec-summary-row td{display:block;padding:0;border:none;}
@@ -1280,7 +1288,7 @@ const CATS = ['Groceries / Household','Utilities & Bills','Dining Out','Kids / C
 const MO   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MOS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DEFAULT_PIN = '1234';
-const APP_VERSION = '2.3.10'; // 2026-05-15 — fit collapsed summary rows
+const APP_VERSION = '2.3.11'; // 2026-05-15 — recurring detail panels
 
 /* ════════════════════════════════════════════════
    STATE
@@ -1831,12 +1839,14 @@ function seedMonth(y,m){
         desc:t.name+' (auto-credit)',
         to:t.creditTo,
         amount:t.creditAmount,
+        payment:t.payment||'',
         recurCreditId:creditId
       });
       changed=true;
     } else {
       if(existing.amount!==t.creditAmount){ existing.amount=t.creditAmount; changed=true; }
       if(existing.to!==t.creditTo){ existing.to=t.creditTo; changed=true; }
+      if((existing.payment||'')!==(t.payment||'')){ existing.payment=t.payment||''; changed=true; }
       if(existing.desc!==t.name+' (auto-credit)'){ existing.desc=t.name+' (auto-credit)'; changed=true; }
     }
   }
@@ -2000,6 +2010,12 @@ function render(){
 }
 
 function moOptions(sel){ return MOS.map((m,i)=>`<option value="${i}" ${i==sel?'selected':''}>${m}</option>`).join(''); }
+function paymentOptions(sel, blank='—'){
+  return [blank,'Amex','Chase','Debit','ACH','Cash','Check','Other'].map((p,i)=>{
+    const v=i===0?'':p;
+    return `<option value="${v}" ${(!sel&&i===0)||sel===v?'selected':''}>${p}</option>`;
+  }).join('');
+}
 function dayOptions(sel){
   let o='<option value="">Day</option>';
   for(let d=1;d<=31;d++) o+=`<option value="${d}" ${d==sel?'selected':''}>${ordinal(d)}</option>`;
@@ -2059,123 +2075,109 @@ function renderRecur(){
     const dr=document.createElement('tr');
     dr.className='rdetail-row'+(collapsed?' r-hidden':'')+(rowClass?' '+rowClass:'');
     dr.innerHTML=`
-      <td colspan="2">
-        <div style="display:flex;flex-direction:column;gap:3px;">
-          <div>
-            <span style="font-size:.55rem;font-weight:700;color:var(--rv);text-transform:uppercase;letter-spacing:.06em;">Paid By</span>
-            <select onchange="updRecurImm(${i},'paidBy',this.value)">
-              <option value="1" ${t.paidBy==='1'?'selected':''}>${name1}</option>
-              <option value="2" ${t.paidBy==='2'?'selected':''}>${name2}</option>
-            </select>
-          </div>
-          <div>
-            <span style="font-size:.55rem;font-weight:700;color:var(--rv);text-transform:uppercase;letter-spacing:.06em;">Category</span>
-            <select onchange="updRecurImm(${i},'cat',this.value)">
-              ${CATS.map(c=>`<option value="${c}" ${(t.cat||'Utilities & Bills')===c?'selected':''}>${c}</option>`).join('')}
-            </select>
-          </div>
-        </div>
-      </td>
-      <td class="rnum">
-        <div style="display:flex;flex-direction:column;gap:3px;">
-          <div>
-            <span style="font-size:.55rem;font-weight:700;color:var(--rv);text-transform:uppercase;letter-spacing:.06em;">Usual Cost</span>
-            <input type="number" value="${esc(t.amount||'')}" placeholder="$0.00" min="0" step="0.01"
-              onchange="updRecurImm(${i},'amount',this.value)">
-          </div>
-          <div>
-            <span style="font-size:.55rem;font-weight:700;color:var(--rv);text-transform:uppercase;letter-spacing:.06em;">Override Cost</span>
-            <div class="ov-wrap">
-              <input type="number" value="${esc(String(ov))}" placeholder="$0.00" min="0" step="0.01"
-                title="Actual cost for ${MO[M]} only — leave blank if same as usual"
-                onchange="setOv('${esc(t.id)}',this.value)">
-              ${ov!==''?`<button class="ov-reset" onclick="clearOv('${esc(t.id)}')" title="Reset to usual cost">✕</button>`:''}
-            </div>
-          </div>
-          ${(freq==='weekly'||freq==='biweekly')&&(parseFloat(disp)||0)?'<div style="font-size:.62rem;color:var(--rv);font-family:DM Mono,monospace;margin-top:1px;">'+getRecurDates(t,Y,M).length+'× = '+fmt((parseFloat(disp)||0)*getRecurDates(t,Y,M).length)+'/mo</div>':''}
-          <div>
-            <span style="font-size:.55rem;font-weight:700;color:var(--rv);text-transform:uppercase;letter-spacing:.06em;">Payment Type</span>
-            <select onchange="updRecurImm(${i},'payment',this.value)">
-              <option value="" ${!t.payment?'selected':''}>—</option>
-              <option value="Amex" ${t.payment==='Amex'?'selected':''}>Amex</option>
-              <option value="Chase" ${t.payment==='Chase'?'selected':''}>Chase</option>
-              <option value="Debit" ${t.payment==='Debit'?'selected':''}>Debit</option>
-              <option value="ACH" ${t.payment==='ACH'?'selected':''}>ACH</option>
-              <option value="Cash" ${t.payment==='Cash'?'selected':''}>Cash</option>
-              <option value="Check" ${t.payment==='Check'?'selected':''}>Check</option>
-              <option value="Other" ${t.payment==='Other'?'selected':''}>Other</option>
-            </select>
-          </div>
-          <div style="margin-top:4px;padding-top:4px;border-top:1px dashed var(--rb);">
-            <span style="font-size:.55rem;font-weight:700;color:var(--cv);text-transform:uppercase;letter-spacing:.06em;">Auto-Credit</span>
-            <div style="display:flex;gap:4px;align-items:center;margin-top:2px;">
-              <input type="number" value="${t.creditAmount||''}" placeholder="$0.00" min="0" step="0.01"
-                style="font-family:'DM Mono',monospace;flex:1;"
-                onchange="updRecurImm(${i},'creditAmount',this.value)">
-              <select onchange="updRecurImm(${i},'creditTo',this.value)" style="flex:1;">
-                <option value="" ${!t.creditTo?'selected':''}>Credit To…</option>
-                <option value="1" ${t.creditTo==='1'?'selected':''}>${name1}</option>
-                <option value="2" ${t.creditTo==='2'?'selected':''}>${name2}</option>
-                <option value="shared" ${t.creditTo==='shared'?'selected':''}>Shared</option>
+      <td colspan="7" class="recur-detail-cell">
+        <div class="recur-detail-panel">
+          <div class="recur-detail-group">
+            <div class="recur-field">
+              <label>Paid By</label>
+              <select onchange="updRecurImm(${i},'paidBy',this.value)">
+                <option value="1" ${t.paidBy==='1'?'selected':''}>${name1}</option>
+                <option value="2" ${t.paidBy==='2'?'selected':''}>${name2}</option>
               </select>
             </div>
+            <div class="recur-field">
+              <label>Category</label>
+              <select onchange="updRecurImm(${i},'cat',this.value)">
+                ${CATS.map(c=>`<option value="${c}" ${(t.cat||'Utilities & Bills')===c?'selected':''}>${c}</option>`).join('')}
+              </select>
+            </div>
+            <div class="recur-field">
+              <label>Payment Type</label>
+              <select onchange="updRecurImm(${i},'payment',this.value)">${paymentOptions(t.payment)}</select>
+            </div>
+          </div>
+          <div class="recur-detail-group">
+            <div class="recur-field rnum">
+              <label>Usual Cost</label>
+              <input type="number" value="${esc(t.amount||'')}" placeholder="$0.00" min="0" step="0.01" onchange="updRecurImm(${i},'amount',this.value)">
+            </div>
+            <div class="recur-field rnum">
+              <label>Override Cost</label>
+              <div class="ov-wrap">
+                <input type="number" value="${esc(String(ov))}" placeholder="$0.00" min="0" step="0.01" title="Actual cost for ${MO[M]} only — leave blank if same as usual" onchange="setOv('${esc(t.id)}',this.value)">
+                ${ov!==''?`<button class="ov-reset" onclick="clearOv('${esc(t.id)}')" title="Reset to usual cost">✕</button>`:''}
+              </div>
+            </div>
+            ${(freq==='weekly'||freq==='biweekly')&&(parseFloat(disp)||0)?'<div class="recur-subtle" style="font-family:DM Mono,monospace;color:var(--rv);">'+getRecurDates(t,Y,M).length+'× = '+fmt((parseFloat(disp)||0)*getRecurDates(t,Y,M).length)+'/mo</div>':''}
+            <div class="recur-field credit">
+              <label>Auto-Credit</label>
+              <div class="recur-inline">
+                <input type="number" value="${t.creditAmount||''}" placeholder="$0.00" min="0" step="0.01" style="font-family:'DM Mono',monospace;" onchange="updRecurImm(${i},'creditAmount',this.value)">
+                <select onchange="updRecurImm(${i},'creditTo',this.value)">
+                  <option value="" ${!t.creditTo?'selected':''}>Credit To…</option>
+                  <option value="1" ${t.creditTo==='1'?'selected':''}>${name1}</option>
+                  <option value="2" ${t.creditTo==='2'?'selected':''}>${name2}</option>
+                  <option value="shared" ${t.creditTo==='shared'?'selected':''}>Shared</option>
+                </select>
+              </div>
+              <div class="recur-subtle">Uses this charge's payment type for generated credits.</div>
+            </div>
+          </div>
+          <div class="recur-detail-group">
+            <div class="recur-field">
+              <label>Frequency</label>
+              <select onchange="updRecurImm(${i},'frequency',this.value)">
+                <option value="monthly" ${(t.frequency||'monthly')==='monthly'?'selected':''}>Monthly</option>
+                <option value="biweekly" ${t.frequency==='biweekly'?'selected':''}>Bi-weekly</option>
+                <option value="weekly" ${t.frequency==='weekly'?'selected':''}>Weekly</option>
+                <option value="semiannual" ${t.frequency==='semiannual'?'selected':''}>Every 6 Months</option>
+                <option value="annual" ${t.frequency==='annual'?'selected':''}>Annual</option>
+              </select>
+            </div>
+            ${(t.frequency||'monthly')==='monthly'?`<div class="recur-field">
+              <label>Charge Day</label>
+              <select onchange="updRecurImm(${i},'chargeDay',this.value)">${chargeDayOptions(t.chargeDay)}</select>
+            </div>`:`<div class="recur-field">
+              <label>Anchor Date</label>
+              <input type="date" value="${t.anchorDate||''}" onblur="updRecurImm(${i},'anchorDate',this.value)" title="First occurrence — all future dates calculated from this">
+              ${getRecurDates(t,Y,M).length?'<div class="recur-subtle">'+getRecurDates(t,Y,M).length+'× this month</div>':''}
+            </div>`}
+            <div class="recur-field">
+              <label>Days Covered</label>
+              <div class="recur-inline">
+                <span class="recur-inline-label">From</span>
+                <select onchange="updRecurImm(${i},'covStartRef',this.value)">
+                  <option value="prev" ${(t.covStartRef||'curr')==='prev'?'selected':''}>Previous Month</option>
+                  <option value="curr" ${(t.covStartRef||'curr')==='curr'?'selected':''}>This Month</option>
+                  <option value="next" ${(t.covStartRef||'curr')==='next'?'selected':''}>Next Month</option>
+                </select>
+                <select onchange="updRecurImm(${i},'covStartDay',this.value)">${dayOptions(t.covStartDay)}</select>
+              </div>
+              <div class="recur-inline">
+                <span class="recur-inline-label">To</span>
+                <select onchange="updRecurImm(${i},'covEndRef',this.value)">
+                  <option value="prev" ${(t.covEndRef||'next')==='prev'?'selected':''}>Previous Month</option>
+                  <option value="curr" ${(t.covEndRef||'next')==='curr'?'selected':''}>This Month</option>
+                  <option value="next" ${(t.covEndRef||'next')==='next'?'selected':''}>Next Month</option>
+                </select>
+                <select onchange="updRecurImm(${i},'covEndDay',this.value)">${dayOptions(t.covEndDay)}</select>
+              </div>
+              ${covLabel?`<div class="recur-subtle">${covLabel}</div>`:''}
+            </div>
+          </div>
+          <div class="recur-detail-group">
+            <div class="recur-field">
+              <label>Months Active</label>
+              <div class="recur-months">
+                ${(t.activeMonths||[1,1,1,1,1,1,1,1,1,1,1,1]).map((on,mi)=>`<button type="button" class="mo-btn ${on?'on':''} ${mi===M?'curr-mo':''}" onclick="toggleActiveMo('${esc(t.id)}',${i},${mi})" title="${MO[mi]}">${MOS[mi][0]}</button>`).join('')}
+              </div>
+            </div>
+            <div class="recur-field">
+              <label>Notes</label>
+              <input class="recur-note-input" type="text" value="${esc(t.notes||'')}" placeholder="Optional note…" onchange="updRecurImm(${i},'notes',this.value)">
+            </div>
           </div>
         </div>
-      </td>
-      <td>
-        <div style="display:flex;flex-direction:column;gap:3px;">
-          <div>
-            <span style="font-size:.55rem;font-weight:700;color:var(--rv);text-transform:uppercase;letter-spacing:.06em;">Frequency</span>
-            <select onchange="updRecurImm(${i},'frequency',this.value)">
-              <option value="monthly" ${(t.frequency||'monthly')==='monthly'?'selected':''}>Monthly</option>
-              <option value="biweekly" ${t.frequency==='biweekly'?'selected':''}>Bi-weekly</option>
-              <option value="weekly" ${t.frequency==='weekly'?'selected':''}>Weekly</option>
-              <option value="semiannual" ${t.frequency==='semiannual'?'selected':''}>Every 6 Months</option>
-              <option value="annual" ${t.frequency==='annual'?'selected':''}>Annual</option>
-            </select>
-          </div>
-          ${(t.frequency||'monthly')==='monthly'?`<div>
-            <span style="font-size:.55rem;font-weight:700;color:var(--rv);text-transform:uppercase;letter-spacing:.06em;">Charge Day</span>
-            <select onchange="updRecurImm(${i},'chargeDay',this.value)" style="width:100%">
-              ${chargeDayOptions(t.chargeDay)}
-            </select>
-          </div>`:`<div>
-            <span style="font-size:.55rem;font-weight:700;color:var(--rv);text-transform:uppercase;letter-spacing:.06em;">Anchor Date</span>
-            <input type="date" value="${t.anchorDate||''}" onblur="updRecurImm(${i},'anchorDate',this.value)" title="First occurrence — all future dates calculated from this">
-            ${getRecurDates(t,Y,M).length?'<div style="font-size:.6rem;color:var(--slate);margin-top:2px;">'+getRecurDates(t,Y,M).length+'× this month</div>':''}
-          </div>`}
-        </div>
-      </td>
-      <td>
-        <div style="display:flex;flex-direction:column;gap:5px;">
-          <div style="display:flex;align-items:center;gap:4px;">
-            <span style="font-size:.65rem;font-weight:700;color:var(--rv);min-width:34px;flex-shrink:0;">From:</span>
-            <select onchange="updRecurImm(${i},'covStartRef',this.value)" style="flex:2;min-width:0;">
-              <option value="prev" ${(t.covStartRef||'curr')==='prev'?'selected':''}>Previous Month</option>
-              <option value="curr" ${(t.covStartRef||'curr')==='curr'?'selected':''}>This Month</option>
-              <option value="next" ${(t.covStartRef||'curr')==='next'?'selected':''}>Next Month</option>
-            </select>
-            <select onchange="updRecurImm(${i},'covStartDay',this.value)" style="flex:1;min-width:0;">${dayOptions(t.covStartDay)}</select>
-          </div>
-          <div style="display:flex;align-items:center;gap:4px;">
-            <span style="font-size:.65rem;font-weight:700;color:var(--rv);min-width:34px;flex-shrink:0;">To:</span>
-            <select onchange="updRecurImm(${i},'covEndRef',this.value)" style="flex:2;min-width:0;">
-              <option value="prev" ${(t.covEndRef||'next')==='prev'?'selected':''}>Previous Month</option>
-              <option value="curr" ${(t.covEndRef||'next')==='curr'?'selected':''}>This Month</option>
-              <option value="next" ${(t.covEndRef||'next')==='next'?'selected':''}>Next Month</option>
-            </select>
-            <select onchange="updRecurImm(${i},'covEndDay',this.value)" style="flex:1;min-width:0;">${dayOptions(t.covEndDay)}</select>
-          </div>
-        </div>
-        ${covLabel?`<div style="font-size:.65rem;color:var(--slate);margin-top:3px;">${covLabel}</div>`:''}
-        <div style="display:flex;align-items:center;gap:6px;margin-top:5px;">
-          <span class="mo-strip-label">Months Active:</span>
-        </div>
-        <div style="display:flex;flex-wrap:nowrap;gap:3px;margin-top:3px;overflow-x:auto;-webkit-overflow-scrolling:touch;">
-          ${(t.activeMonths||[1,1,1,1,1,1,1,1,1,1,1,1]).map((on,mi)=>`<button type="button" class="mo-btn ${on?'on':''} ${mi===M?'curr-mo':''}" onclick="toggleActiveMo('${esc(t.id)}',${i},${mi})" title="${MO[mi]}">${MOS[mi][0]}</button>`).join('')}
-        </div>
-      </td>
-      <td><input type="text" value="${esc(t.notes||'')}" placeholder="Optional note…" onchange="updRecurImm(${i},'notes',this.value)" style="min-width:120px">
       </td>`;
     tbody.appendChild(dr);
   });
@@ -2554,8 +2556,8 @@ function updRecurImm(i,f,v){
     render();
     return;
   }
-  // Sync seeded expense(s) in current month for fields that affect totals
-  if(f==='amount'||f==='paidBy'||f==='name'||f==='cat'){
+  // Sync seeded expense(s) and auto-credits in the current month for fields that affect generated rows.
+  if(f==='amount'||f==='paidBy'||f==='name'||f==='cat'||f==='payment'||f==='creditAmount'||f==='creditTo'){
     const md=getMD(Y,M);
     const tid=RECUR[i].id;
     for(const e of md.expenses){
@@ -2575,6 +2577,7 @@ function updRecurImm(i,f,v){
         }
       }
     }
+    seedMonth(Y,M);
     saveMD();
   }
   renderRecur(); partialSummary();
@@ -2918,11 +2921,13 @@ function seedPersonalMonth(who,y,m){
         date:'',
         desc:t.name+' (auto-credit)',
         amount:t.creditAmount,
+        payment:t.payment||'',
         recurCreditId:creditId
       });
       changed=true;
     } else {
       if(existing.amount!==t.creditAmount){ existing.amount=t.creditAmount; changed=true; }
+      if((existing.payment||'')!==(t.payment||'')){ existing.payment=t.payment||''; changed=true; }
       if(existing.desc!==t.name+' (auto-credit)'){ existing.desc=t.name+' (auto-credit)'; changed=true; }
     }
   }
@@ -3035,96 +3040,87 @@ function renderPersSubs(who){
     const tr=document.createElement('tr');
     tr.className='rdetail-row'+(collapsed?' r-hidden':'')+(rowClass?' '+rowClass:'');
     tr.innerHTML=`
-      <td colspan="2" class="rnum">
-        <div style="display:flex;flex-direction:column;gap:3px;">
-          <div>
-            <span style="font-size:.55rem;font-weight:700;color:var(--rv);text-transform:uppercase;letter-spacing:.06em;">Usual Cost</span>
-            <input type="number" value="${esc(t.amount||'')}" placeholder="$0.00" min="0" step="0.01" onchange="updPSub('${who}',${i},'amount',this.value)" title="Usual monthly cost">
-          </div>
-          <div>
-            <span style="font-size:.55rem;font-weight:700;color:var(--rv);text-transform:uppercase;letter-spacing:.06em;">Override Cost</span>
-            <div class="ov-wrap">
-              <input type="number" value="${esc(String(ov))}" placeholder="$0.00" min="0" step="0.01"
-                title="Actual cost this month — leave blank if same"
-                onchange="setPersOv('${who}','${esc(t.id)}',this.value)">
-              ${ov!==''?`<button class="ov-reset" onclick="clearPersOv('${who}','${esc(t.id)}')" title="Reset">✕</button>`:''}
+      <td colspan="6" class="recur-detail-cell">
+        <div class="recur-detail-panel">
+          <div class="recur-detail-group">
+            <div class="recur-field rnum">
+              <label>Usual Cost</label>
+              <input type="number" value="${esc(t.amount||'')}" placeholder="$0.00" min="0" step="0.01" onchange="updPSub('${who}',${i},'amount',this.value)" title="Usual monthly cost">
+            </div>
+            <div class="recur-field rnum">
+              <label>Override Cost</label>
+              <div class="ov-wrap">
+                <input type="number" value="${esc(String(ov))}" placeholder="$0.00" min="0" step="0.01" title="Actual cost this month — leave blank if same" onchange="setPersOv('${who}','${esc(t.id)}',this.value)">
+                ${ov!==''?`<button class="ov-reset" onclick="clearPersOv('${who}','${esc(t.id)}')" title="Reset">✕</button>`:''}
+              </div>
+            </div>
+            ${(pFreq==='weekly'||pFreq==='biweekly')&&(parseFloat(disp)||0)?'<div class="recur-subtle" style="font-family:DM Mono,monospace;color:var(--rv);">'+((pFreq==='weekly')?'4-5':'2-3')+'× ≈ '+fmt((parseFloat(disp)||0)*((pFreq==='weekly')?4.33:2.17))+'/mo</div>':''}
+            <div class="recur-field">
+              <label>Payment Type</label>
+              <select onchange="updPSub('${who}',${i},'payment',this.value)">${paymentOptions(t.payment)}</select>
             </div>
           </div>
-          ${(pFreq==='weekly'||pFreq==='biweekly')&&(parseFloat(disp)||0)?'<div style="font-size:.62rem;color:var(--rv);font-family:DM Mono,monospace;margin-top:1px;">'+((pFreq==='weekly')?'4-5':'2-3')+'× ≈ '+fmt((parseFloat(disp)||0)*((pFreq==='weekly')?4.33:2.17))+'/mo</div>':''}
-          <div>
-            <span style="font-size:.55rem;font-weight:700;color:var(--rv);text-transform:uppercase;letter-spacing:.06em;">Payment Type</span>
-            <select onchange="updPSub('${who}',${i},'payment',this.value)">
-              <option value="" ${!t.payment?'selected':''}>—</option>
-              <option value="Amex" ${t.payment==='Amex'?'selected':''}>Amex</option>
-              <option value="Chase" ${t.payment==='Chase'?'selected':''}>Chase</option>
-              <option value="Debit" ${t.payment==='Debit'?'selected':''}>Debit</option>
-              <option value="ACH" ${t.payment==='ACH'?'selected':''}>ACH</option>
-              <option value="Cash" ${t.payment==='Cash'?'selected':''}>Cash</option>
-              <option value="Check" ${t.payment==='Check'?'selected':''}>Check</option>
-              <option value="Other" ${t.payment==='Other'?'selected':''}>Other</option>
-            </select>
+          <div class="recur-detail-group">
+            <div class="recur-field credit">
+              <label>Auto-Credit</label>
+              <input type="number" value="${t.creditAmount||''}" placeholder="$0.00" min="0" step="0.01" style="font-family:'DM Mono',monospace;" onchange="updPSub('${who}',${i},'creditAmount',this.value)">
+              <div class="recur-subtle">Uses this subscription's payment type for generated credits.</div>
+            </div>
+            <div class="recur-field">
+              <label>Frequency</label>
+              <select onchange="updPSub('${who}',${i},'frequency',this.value)">
+                <option value="monthly" ${(t.frequency||'monthly')==='monthly'?'selected':''}>Monthly</option>
+                <option value="biweekly" ${t.frequency==='biweekly'?'selected':''}>Bi-weekly</option>
+                <option value="weekly" ${t.frequency==='weekly'?'selected':''}>Weekly</option>
+                <option value="semiannual" ${t.frequency==='semiannual'?'selected':''}>Every 6 Months</option>
+                <option value="annual" ${t.frequency==='annual'?'selected':''}>Annual</option>
+              </select>
+            </div>
+            ${(t.frequency||'monthly')==='monthly'?`<div class="recur-field">
+              <label>Charge Day</label>
+              <select onchange="updPSub('${who}',${i},'chargeDay',this.value)">${chargeDayOptions(t.chargeDay)}</select>
+            </div>`:`<div class="recur-field">
+              <label>Anchor Date</label>
+              <input type="date" value="${t.anchorDate||''}" onblur="updPSub('${who}',${i},'anchorDate',this.value)" title="First occurrence — all future dates calculated from this">
+            </div>`}
           </div>
-          <div style="margin-top:4px;padding-top:4px;border-top:1px dashed var(--rb);">
-            <span style="font-size:.55rem;font-weight:700;color:var(--cv);text-transform:uppercase;letter-spacing:.06em;">Auto-Credit</span>
-            <input type="number" value="${t.creditAmount||''}" placeholder="$0.00" min="0" step="0.01"
-              style="font-family:'DM Mono',monospace;margin-top:2px;"
-              onchange="updPSub('${who}',${i},'creditAmount',this.value)">
+          <div class="recur-detail-group">
+            <div class="recur-field">
+              <label>Days Covered</label>
+              <div class="recur-inline">
+                <span class="recur-inline-label">From</span>
+                <select onchange="updPSub('${who}',${i},'covStartRef',this.value)">
+                  <option value="prev" ${(t.covStartRef||'curr')==='prev'?'selected':''}>Previous Month</option>
+                  <option value="curr" ${(t.covStartRef||'curr')==='curr'?'selected':''}>This Month</option>
+                  <option value="next" ${(t.covStartRef||'curr')==='next'?'selected':''}>Next Month</option>
+                </select>
+                <select onchange="updPSub('${who}',${i},'covStartDay',this.value)">${dayOptions(t.covStartDay)}</select>
+              </div>
+              <div class="recur-inline">
+                <span class="recur-inline-label">To</span>
+                <select onchange="updPSub('${who}',${i},'covEndRef',this.value)">
+                  <option value="prev" ${(t.covEndRef||'next')==='prev'?'selected':''}>Previous Month</option>
+                  <option value="curr" ${(t.covEndRef||'next')==='curr'?'selected':''}>This Month</option>
+                  <option value="next" ${(t.covEndRef||'next')==='next'?'selected':''}>Next Month</option>
+                </select>
+                <select onchange="updPSub('${who}',${i},'covEndDay',this.value)">${dayOptions(t.covEndDay)}</select>
+              </div>
+              ${covLabel?`<div class="recur-subtle">${covLabel}</div>`:''}
+            </div>
+            <div class="recur-field">
+              <label>Months Active</label>
+              <div class="recur-months">
+                ${(t.activeMonths||[1,1,1,1,1,1,1,1,1,1,1,1]).map((on,mi)=>`<button type="button" class="mo-btn ${on?'on':''} ${mi===PM?'curr-mo':''}" onclick="togglePersActiveMo('${who}','${esc(t.id)}',${i},${mi})" title="${MO[mi]}">${MOS[mi][0]}</button>`).join('')}
+              </div>
+            </div>
           </div>
-        </div>
-      </td>
-      <td>
-        <div style="display:flex;flex-direction:column;gap:3px;">
-          <div>
-            <span style="font-size:.55rem;font-weight:700;color:var(--rv);text-transform:uppercase;letter-spacing:.06em;">Frequency</span>
-            <select onchange="updPSub('${who}',${i},'frequency',this.value)">
-              <option value="monthly" ${(t.frequency||'monthly')==='monthly'?'selected':''}>Monthly</option>
-              <option value="biweekly" ${t.frequency==='biweekly'?'selected':''}>Bi-weekly</option>
-              <option value="weekly" ${t.frequency==='weekly'?'selected':''}>Weekly</option>
-              <option value="semiannual" ${t.frequency==='semiannual'?'selected':''}>Every 6 Months</option>
-              <option value="annual" ${t.frequency==='annual'?'selected':''}>Annual</option>
-            </select>
-          </div>
-          ${(t.frequency||'monthly')==='monthly'?`<div>
-            <span style="font-size:.55rem;font-weight:700;color:var(--rv);text-transform:uppercase;letter-spacing:.06em;">Charge Day</span>
-            <select onchange="updPSub('${who}',${i},'chargeDay',this.value)" style="width:100%">
-              ${chargeDayOptions(t.chargeDay)}
-            </select>
-          </div>`:`<div>
-            <span style="font-size:.55rem;font-weight:700;color:var(--rv);text-transform:uppercase;letter-spacing:.06em;">Anchor Date</span>
-            <input type="date" value="${t.anchorDate||''}" onblur="updPSub('${who}',${i},'anchorDate',this.value)" title="First occurrence — all future dates calculated from this">
-          </div>`}
-        </div>
-      </td>
-      <td>
-        <div style="display:flex;flex-direction:column;gap:5px;">
-          <div style="display:flex;align-items:center;gap:4px;">
-            <span style="font-size:.65rem;font-weight:700;color:var(--rv);min-width:34px;flex-shrink:0;">From:</span>
-            <select onchange="updPSub('${who}',${i},'covStartRef',this.value)" style="flex:2;min-width:0;">
-              <option value="prev" ${(t.covStartRef||'curr')==='prev'?'selected':''}>Previous Month</option>
-              <option value="curr" ${(t.covStartRef||'curr')==='curr'?'selected':''}>This Month</option>
-              <option value="next" ${(t.covStartRef||'curr')==='next'?'selected':''}>Next Month</option>
-            </select>
-            <select onchange="updPSub('${who}',${i},'covStartDay',this.value)" style="flex:1;min-width:0;">${dayOptions(t.covStartDay)}</select>
-          </div>
-          <div style="display:flex;align-items:center;gap:4px;">
-            <span style="font-size:.65rem;font-weight:700;color:var(--rv);min-width:34px;flex-shrink:0;">To:</span>
-            <select onchange="updPSub('${who}',${i},'covEndRef',this.value)" style="flex:2;min-width:0;">
-              <option value="prev" ${(t.covEndRef||'next')==='prev'?'selected':''}>Previous Month</option>
-              <option value="curr" ${(t.covEndRef||'next')==='curr'?'selected':''}>This Month</option>
-              <option value="next" ${(t.covEndRef||'next')==='next'?'selected':''}>Next Month</option>
-            </select>
-            <select onchange="updPSub('${who}',${i},'covEndDay',this.value)" style="flex:1;min-width:0;">${dayOptions(t.covEndDay)}</select>
+          <div class="recur-detail-group">
+            <div class="recur-field">
+              <label>Notes</label>
+              <input class="recur-note-input" type="text" value="${esc(t.notes||'')}" placeholder="Optional note…" onchange="updPSub('${who}',${i},'notes',this.value)">
+            </div>
           </div>
         </div>
-        ${covLabel?`<div style="font-size:.65rem;color:var(--slate);margin-top:3px;">${covLabel}</div>`:''}
-        <div style="display:flex;align-items:center;gap:6px;margin-top:5px;">
-          <span class="mo-strip-label">Months Active:</span>
-        </div>
-        <div style="display:flex;flex-wrap:nowrap;gap:3px;margin-top:3px;overflow-x:auto;-webkit-overflow-scrolling:touch;">
-          ${(t.activeMonths||[1,1,1,1,1,1,1,1,1,1,1,1]).map((on,mi)=>`<button type="button" class="mo-btn ${on?'on':''} ${mi===PM?'curr-mo':''}" onclick="togglePersActiveMo('${who}','${esc(t.id)}',${i},${mi})" title="${MO[mi]}">${MOS[mi][0]}</button>`).join('')}
-        </div>
-      </td>
-      <td><input type="text" value="${esc(t.notes||'')}" placeholder="Optional note…" onchange="updPSub('${who}',${i},'notes',this.value)" style="min-width:120px">
       </td>`;
     tbody.appendChild(tr);
   });
@@ -3302,6 +3298,9 @@ function updPSub(who,i,f,v){
     // Re-seed
     const md=getPMD(who,PY,PM);
     md.seeded=false;
+    seedPersonalMonth(who,PY,PM);
+  }
+  if(f==='payment'||f==='creditAmount'||f==='name'){
     seedPersonalMonth(who,PY,PM);
   }
   renderPersSubs(who); renderPersHist(who);
