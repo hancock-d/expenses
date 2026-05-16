@@ -403,6 +403,9 @@ main{max-width:1100px;margin:0 auto;padding:18px 14px calc(18px + var(--safe-bot
 .rdetail-row.r-hidden+.rsummary-row,.rsummary-row:first-child{border-top:none;}
 .rsum{font-family:'DM Mono',monospace;font-size:.78rem;color:var(--slate);}
 .rsummary-row .rsum{flex:0 0 auto;margin-left:auto;}
+@media(min-width:641px){
+  .rsummary-row .rsum{flex-basis:178px;text-align:right;white-space:nowrap;}
+}
 .rname-edit,.ec-name-edit{font-weight:500;font-size:.82rem;padding:1px 0;font-family:'DM Sans',sans-serif;color:var(--ink);min-width:60px;flex:1;outline:none;border:1px solid transparent;border-radius:4px;background:transparent;line-height:1.35;}
 .rname-edit:hover,.ec-name-edit:hover{background:white;padding-left:6px;padding-right:6px;}
 .rname-edit:hover{border-color:var(--rb);}
@@ -597,14 +600,15 @@ td.anum input{font-family:'DM Mono',monospace;font-weight:500;text-align:left;}
   .etable td input,.etable td select{font-size:.85rem;}
 
   /* Recurring mobile — compact card layout */
-  .rtable{min-width:0;}
+  .rzone .zcollapse{overflow-x:hidden;}
+  .rtable,.rtable tbody{display:block;width:100%;max-width:100%;min-width:0;}
   .rtable thead{display:none;}
   /* Summary rows — simple block layout */
-  .rtable tbody tr.rsummary-row{display:block;padding:8px 12px;border-bottom:1px solid var(--rb);}
-  .rtable tbody tr.rsummary-row td{display:block;padding:0;border:none;}
-  /* Detail rows — stacked grid
-     td order: 1=name(colspan2) 2=paidby+cat 3=cost 4=details 5=days-covered 6=notes+delete */
-  .rtable tbody tr.rdetail-row{display:table-row;border-bottom:2px solid var(--rb)!important;}
+  .rtable tbody tr.rsummary-row{display:block;width:100%;box-sizing:border-box;padding:8px 12px;border-bottom:1px solid var(--rb);}
+  .rtable tbody tr.rsummary-row td{display:block;width:100%;box-sizing:border-box;padding:0;border:none;}
+  /* Detail rows use a real panel now; keep mobile out of table layout so expand/collapse cannot shift rows. */
+  .rtable tbody tr.rdetail-row{display:block;width:100%;box-sizing:border-box;border-bottom:2px solid var(--rb)!important;}
+  .rtable tbody tr.rdetail-row td.recur-detail-cell{display:block;width:100%;box-sizing:border-box;}
   .rtable tbody td{padding:2px 0;border:none;min-width:0;}
   /* Coverage dropdowns inline */
   .rtable .cov-wrap{display:flex;flex-wrap:nowrap;align-items:center;gap:4px;}
@@ -642,9 +646,12 @@ td.anum input{font-family:'DM Mono',monospace;font-weight:500;text-align:left;}
   /* ── Personal page mobile overrides ──
      Personal rtable detail has 5 tds: 1=name(colspan2) 2=cost 3=details 4=days-covered 5=notes+delete
      Personal etable has 7 tds: 1=date 2=desc 3=cat 4=payment 5=amount 6=notes 7=delete */
-  #pers-overlay .rtable tbody tr.rsummary-row{display:block;padding:8px 12px;border-bottom:1px solid var(--rb);}
-  #pers-overlay .rtable tbody tr.rsummary-row td{display:block;padding:0;border:none;}
-  #pers-overlay .rtable tbody tr.rdetail-row{display:table-row;}
+  #pers-overlay .rzone .zcollapse{overflow-x:hidden;}
+  #pers-overlay .rtable,#pers-overlay .rtable tbody{display:block;width:100%;max-width:100%;min-width:0;}
+  #pers-overlay .rtable tbody tr.rsummary-row{display:block;width:100%;box-sizing:border-box;padding:8px 12px;border-bottom:1px solid var(--rb);}
+  #pers-overlay .rtable tbody tr.rsummary-row td{display:block;width:100%;box-sizing:border-box;padding:0;border:none;}
+  #pers-overlay .rtable tbody tr.rdetail-row{display:block;width:100%;box-sizing:border-box;}
+  #pers-overlay .rtable tbody tr.rdetail-row td.recur-detail-cell{display:block;width:100%;box-sizing:border-box;}
 
   #pers-overlay .etable tbody tr.ec-summary-row{display:block;padding:8px 12px;border-bottom:1px solid var(--border);}
   #pers-overlay .etable tbody tr.ec-summary-row td{display:block;padding:0;border:none;}
@@ -723,6 +730,9 @@ td.anum input{font-family:'DM Mono',monospace;font-weight:500;text-align:left;}
 .pers-card-sm{background:white;border-radius:10px;padding:12px 14px;box-shadow:var(--sh);border:1px solid var(--border);}
 .pers-card-sm .card-label{font-size:.63rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--slate);margin-bottom:3px;}
 .pers-card-sm .card-value{font-family:'DM Mono',monospace;font-size:1.2rem;font-weight:500;line-height:1;}
+.pers-home-card{cursor:pointer;transition:box-shadow .18s,transform .18s;border-left:4px solid var(--ink);}
+.pers-home-card:hover{box-shadow:0 4px 20px rgba(26,20,16,.14);transform:translateY(-1px);}
+.pers-home-card .card-value{font-family:'DM Serif Display',serif;color:var(--ink);}
 
 /* personal history */
 .phist-table{width:100%;border-collapse:collapse;}
@@ -732,6 +742,7 @@ td.anum input{font-family:'DM Mono',monospace;font-weight:500;text-align:left;}
 
 @media(max-width:640px){
   #pers-overlay .summary-bar{grid-template-columns:1fr 1fr;}
+  #pers-overlay .pers-home-card{grid-column:1/-1;}
   .pers-main{padding:12px 10px;}
 }
 
@@ -1142,6 +1153,11 @@ input[placeholder="Optional note…"]:focus {
 
       <!-- Summary strip -->
       <div class="summary-bar" style="grid-template-columns:repeat(3,1fr);">
+        <div class="card pers-home-card" onclick="closePersonal()" title="Return to joint tracker">
+          <div class="card-label">Home</div>
+          <div class="card-value">Family Budget</div>
+          <div class="card-sub">return to joint tracker</div>
+        </div>
         <div class="card">
           <div class="card-label">Subscriptions</div>
           <div class="card-value" id="ps-sub-total">$0.00</div>
@@ -1298,7 +1314,7 @@ const CATS = ['Groceries / Household','Utilities & Bills','Dining Out','Kids / C
 const MO   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MOS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DEFAULT_PIN = '1234';
-const APP_VERSION = '2.3.12'; // 2026-05-15 — family route recovery
+const APP_VERSION = '2.3.14'; // 2026-05-15 — recurring summary note lane
 const FAMILY_RECOVERY_IDS = ['fam_3g9178wnsrg2'];
 
 /* ════════════════════════════════════════════════
