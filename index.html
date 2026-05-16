@@ -392,13 +392,17 @@ main{max-width:1100px;margin:0 auto;padding:18px 14px calc(18px + var(--safe-bot
 .rdetail-row.r-hidden{display:none!important;}
 .rdetail-row.r-hidden+.rsummary-row,.rsummary-row:first-child{border-top:none;}
 .rsum{font-family:'DM Mono',monospace;font-size:.78rem;color:var(--slate);}
-.rname-edit{font-weight:500;font-size:.82rem;padding:1px 0;font-family:'DM Sans',sans-serif;color:var(--ink);min-width:60px;flex:1;outline:none;border:1px solid transparent;border-radius:4px;background:transparent;line-height:1.35;}
-.rname-edit:hover{border-color:var(--rb);background:white;padding-left:6px;padding-right:6px;}
-.rname-edit:focus{border-color:var(--rv);background:white;}
-.rname-edit:empty::before{content:attr(data-placeholder);color:var(--slate);opacity:.5;font-style:italic;}
+.rname-edit,.ec-name-edit{font-weight:500;font-size:.82rem;padding:1px 0;font-family:'DM Sans',sans-serif;color:var(--ink);min-width:60px;flex:1;outline:none;border:1px solid transparent;border-radius:4px;background:transparent;line-height:1.35;}
+.rname-edit:hover,.ec-name-edit:hover{background:white;padding-left:6px;padding-right:6px;}
+.rname-edit:hover{border-color:var(--rb);}
+.ec-name-edit:hover{border-color:var(--border);}
+.rname-edit:focus,.ec-name-edit:focus{background:white;}
+.rname-edit:focus{border-color:var(--rv);}
+.ec-name-edit:focus{border-color:var(--slate);}
+.rname-edit:empty::before,.ec-name-edit:empty::before{content:attr(data-placeholder);color:var(--slate);opacity:.5;font-style:italic;}
 @media(max-width:640px){
-  .rsummary-row .rname-edit{font-size:.82rem;}
-  .rname-edit:focus{font-size:16px;}
+  .rsummary-row .rname-edit,.ec-summary-row .ec-name-edit{font-size:.82rem;}
+  .rname-edit:focus,.ec-name-edit:focus{font-size:16px;}
 }
 .rexp-toggle{background:var(--rbg);border:1px solid var(--rb);font-size:.65rem;color:var(--rv);cursor:pointer;padding:6px 8px;border-radius:4px;vertical-align:middle;flex-shrink:0;touch-action:manipulation;line-height:1;}
 .rexp-toggle:hover{background:var(--rb);color:white;}
@@ -1264,7 +1268,7 @@ const CATS = ['Groceries / Household','Utilities & Bills','Dining Out','Kids / C
 const MO   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MOS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DEFAULT_PIN = '1234';
-const APP_VERSION = '2.3.7'; // 2026-05-14 — family action event delegation
+const APP_VERSION = '2.3.8'; // 2026-05-15 — inline expense descriptions
 
 /* ════════════════════════════════════════════════
    STATE
@@ -2208,7 +2212,7 @@ function renderCredits(){
       </div>
       <button class="ec-toggle" onclick="toggleRowCollapse('cred',${i},this)">${collapsed?'▶':'▼'}</button>
       ${isAuto?'<span style="font-size:.55rem;font-weight:700;color:var(--cv);background:var(--cbg);border:1px solid var(--cb);border-radius:4px;padding:1px 5px;">AUTO</span>':''}
-      <span style="font-weight:500;font-size:.82rem;">${esc(c.desc||'(no description)')}</span>
+      <span contenteditable="true" class="ec-name-edit" data-placeholder="Enter credit description…" onblur="const _d=this.textContent.trim();setTimeout(()=>updCredit(${i},'desc',_d),150)">${esc(c.desc||'')}</span>
       <span style="font-family:'DM Mono',monospace;font-size:.82rem;color:var(--cv);margin-left:auto;">${fmt(parseFloat(c.amount)||0)}</span>
       ${c.notes?'<span class="ec-note">'+esc(c.notes)+'</span>':''}
       ${isAuto?'':'<button class="cdel-btn" onclick="confirmDel(this,()=>delCredit('+i+'))" style="margin-left:4px;">✕</button>'}
@@ -2277,7 +2281,7 @@ function renderExpenses(){
         <button class="reorder-btn" onclick="reorderExp(${i},1)" ${eidx===oneOff.length-1?'disabled style="visibility:hidden"':''} title="Move down">▼</button>
       </div>
       <button class="ec-toggle" onclick="toggleRowCollapse('exp',${eidx},this)">${collapsed?'▶':'▼'}</button>
-      <span style="font-weight:500;font-size:.82rem;">${esc(e.desc||'(no description)')}</span>
+      <span contenteditable="true" class="ec-name-edit" data-placeholder="Enter expense description…" onblur="const _d=this.textContent.trim();setTimeout(()=>updExp(${i},'desc',_d),150)">${esc(e.desc||'')}</span>
       <span style="font-family:'DM Mono',monospace;font-size:.82rem;color:var(--slate);margin-left:auto;">${fmt(parseFloat(e.amount)||0)}</span>
       ${e.notes?'<span class="ec-note">'+esc(e.notes)+'</span>':''}
       <button class="del-btn" onclick="confirmDel(this,()=>delExp(${i}))" style="margin-left:4px;">✕</button>
@@ -2439,6 +2443,24 @@ function scrollToLastRow(tbodyId, container){
       setTimeout(()=>{last.style.background='';},1500);
     }
   },100);
+}
+function focusLastInlineName(tbodyId){
+  setTimeout(()=>{
+    const tbody=document.getElementById(tbodyId);
+    if(!tbody) return;
+    const names=tbody.querySelectorAll('.ec-name-edit,.rname-edit');
+    const el=names[names.length-1];
+    if(!el) return;
+    try{
+      el.focus();
+      const range=document.createRange();
+      range.selectNodeContents(el);
+      range.collapse(false);
+      const sel=window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }catch(e){}
+  },140);
 }
 
 // Header "+ Add" wrappers — open zone if collapsed, add item, scroll to it
@@ -2660,9 +2682,14 @@ function addExp(){
   const md=getMD(Y,M); const n=new Date();
   md.expenses.push({date:`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`,desc:'',cat:CATS[0],paidBy:'1',amount:''});
   saveMD(); render();
+  focusLastInlineName('e-tbody');
 }
 function updExp(i,f,v){
   const md=getMD(Y,M); md.expenses[i][f]=v; saveMD(); partialSummary(); renderCats(); renderHistory();
+  if(f==='desc'||f==='notes'){
+    renderExpenses();
+    return;
+  }
   const oneOff=md.expenses.filter(e=>!e.recurId);
   const ootEl=document.getElementById('other-total-tag');
   if(ootEl) ootEl.textContent=fmt(oneOff.reduce((s,e)=>s+(parseFloat(e.amount)||0),0));
@@ -2679,12 +2706,13 @@ function addCredit(){
   const md=getMD(Y,M); const n=new Date();
   md.credits.push({date:`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`,desc:'',to:'1',amount:''});
   saveMD(); render();
+  focusLastInlineName('c-tbody');
 }
 function updCredit(i,f,v){
   const md=getMD(Y,M); md.credits[i][f]=v; saveMD();
   partialSummary(); renderHistory();
-  if(f!=='amount'&&f!=='notes'){
-    // Only rebuild table for structural changes (to, date, desc)
+  if(f!=='amount'){
+    // Rebuild table for text/select/date changes so summary and detail rows stay in sync.
     renderCredits();
   } else {
     // Just update the total badge without rebuilding the table
@@ -3124,7 +3152,7 @@ function renderPersExps(who){
         <button class="reorder-btn" onclick="reorderPExp('${who}',${ei},1)" ${pidx===oneOff.length-1?'disabled style="visibility:hidden"':''} title="Move down">▼</button>
       </div>
       <button class="ec-toggle" onclick="toggleRowCollapse('pexp',${pidx},this)">${collapsed?'▶':'▼'}</button>
-      <span style="font-weight:500;font-size:.82rem;">${esc(e.desc||'(no description)')}</span>
+      <span contenteditable="true" class="ec-name-edit" data-placeholder="Enter expense description…" onblur="const _d=this.textContent.trim();setTimeout(()=>updPExp('${who}',${ei},'desc',_d),150)">${esc(e.desc||'')}</span>
       <span style="font-family:'DM Mono',monospace;font-size:.82rem;color:var(--slate);margin-left:auto;">${fmt(parseFloat(e.amount)||0)}</span>
       ${e.notes?'<span class="ec-note">'+esc(e.notes)+'</span>':''}
       <button class="del-btn" onclick="confirmDel(this,()=>delPExp('${who}',${ei}))" style="margin-left:4px;">✕</button>
@@ -3310,10 +3338,12 @@ function addPersExp(){
     desc:'',cat:CATS[0],amount:'',notes:''
   });
   savePMD(persWho); renderPersExps(persWho);
+  focusLastInlineName('ps-exp-tbody');
 }
 function updPExp(who,i,f,v){
   const md=getPMD(who,PY,PM); md.expenses[i][f]=v; savePMD(who);
   updatePersTotals(who); renderPersHist(who);
+  if(f==='desc'||f==='notes') renderPersExps(who);
 }
 function updPExpAmt(who,i,v){
   const md=getPMD(who,PY,PM); md.expenses[i].amount=v; savePMD(who);
@@ -3359,7 +3389,7 @@ function renderPersCredits(who){
       </div>
       <button class="ec-toggle" onclick="toggleRowCollapse('pcred',${i},this)">${collapsed?'▶':'▼'}</button>
       ${isAuto?'<span style="font-size:.55rem;font-weight:700;color:var(--cv);background:var(--cbg);border:1px solid var(--cb);border-radius:4px;padding:1px 5px;">AUTO</span>':''}
-      <span style="font-weight:500;font-size:.82rem;">${esc(c.desc||'(no description)')}</span>
+      <span contenteditable="true" class="ec-name-edit" data-placeholder="Enter credit description…" onblur="const _d=this.textContent.trim();setTimeout(()=>updPersCredit('${who}',${i},'desc',_d),150)">${esc(c.desc||'')}</span>
       <span style="font-family:'DM Mono',monospace;font-size:.82rem;color:var(--cv);margin-left:auto;">${fmt(parseFloat(c.amount)||0)}</span>
       ${c.notes?'<span class="ec-note">'+esc(c.notes)+'</span>':''}
       ${isAuto?'':'<button class="cdel-btn" onclick="confirmDel(this,()=>delPersCredit(\''+who+'\','+i+'))" style="margin-left:4px;">✕</button>'}
@@ -3405,6 +3435,7 @@ function addPersCredit(){
   const n=new Date();
   md.credits.push({date:`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`,desc:'',amount:'',notes:''});
   savePMD(persWho); renderPersCredits(persWho);
+  focusLastInlineName('ps-c-tbody');
 }
 function updPersCredit(who,i,f,v){
   const md=getPMD(who,PY,PM); md.credits[i][f]=v; savePMD(who);
