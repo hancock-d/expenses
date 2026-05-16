@@ -71,6 +71,16 @@ window._fbGet = async (path) => {
   }
 };
 
+window._fbGetStatus = async (path) => {
+  try {
+    const s = await getDoc(dbDoc(path));
+    return {ok:true, exists:s.exists(), data:s.exists() ? s.data() : null};
+  } catch(e) {
+    console.error('FB read failed:', path, e.code, e.message);
+    return {ok:false, exists:false, data:null, error:e};
+  }
+};
+
 window._fbListen = (path, cb) => {
   return onSnapshot(
     dbDoc(path),
@@ -1288,7 +1298,8 @@ const CATS = ['Groceries / Household','Utilities & Bills','Dining Out','Kids / C
 const MO   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MOS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DEFAULT_PIN = '1234';
-const APP_VERSION = '2.3.11'; // 2026-05-15 — recurring detail panels
+const APP_VERSION = '2.3.12'; // 2026-05-15 — family route recovery
+const FAMILY_RECOVERY_IDS = ['fam_3g9178wnsrg2'];
 
 /* ════════════════════════════════════════════════
    STATE
@@ -2065,8 +2076,8 @@ function renderRecur(){
       </div>
       <button class="rexp-toggle" onclick="toggleRowCollapse('recur',${i},this)">${collapsed?'▶':'▼'}</button>
       <span contenteditable="true" class="rname-edit" data-placeholder="Enter charge name…" onblur="const _n=this.textContent.trim();setTimeout(()=>updRecur(${i},'name',_n),150)">${esc(t.name||'')}</span>
-      <span class="rsum">${fmt(moTotal)}${freq==='weekly'||freq==='biweekly'?' ('+occ+'×)':freq==='annual'?' (annual)':freq==='semiannual'?' (every 6 mo)':''}</span>
       ${t.notes?'<span class="ec-note" style="color:var(--rv);">'+esc(t.notes)+'</span>':''}
+      <span class="rsum">${fmt(moTotal)}${freq==='weekly'||freq==='biweekly'?' ('+occ+'×)':freq==='annual'?' (annual)':freq==='semiannual'?' (every 6 mo)':''}</span>
       <button class="del-btn" onclick="confirmDel(this,()=>delRecur(${i}))" style="margin-left:4px;" title="Delete">✕</button>
     </div></td>`;
     tbody.appendChild(sr);
@@ -3030,8 +3041,8 @@ function renderPersSubs(who){
       </div>
       <button class="rexp-toggle" onclick="toggleRowCollapse('precur',${i},this)">${collapsed?'▶':'▼'}</button>
       <span contenteditable="true" class="rname-edit" data-placeholder="Enter subscription name…" onblur="const _n=this.textContent.trim();setTimeout(()=>{PSUBS['${who}'][${i}].name=_n;savePMeta();},150)">${esc(t.name||'')}</span>
-      <span class="rsum">${fmt(pMoTotal)}${pFreq==='weekly'||pFreq==='biweekly'?' (≈/mo)':pFreq==='annual'?' (annual)':pFreq==='semiannual'?' (every 6 mo)':''}</span>
       ${t.notes?'<span class="ec-note" style="color:var(--rv);">'+esc(t.notes)+'</span>':''}
+      <span class="rsum">${fmt(pMoTotal)}${pFreq==='weekly'||pFreq==='biweekly'?' (≈/mo)':pFreq==='annual'?' (annual)':pFreq==='semiannual'?' (every 6 mo)':''}</span>
       <button class="del-btn" onclick="confirmDel(this,()=>delPSub('${who}',${i}))" style="margin-left:4px;" title="Delete">✕</button>
     </div></td>`;
     tbody.appendChild(sr);
@@ -3963,23 +3974,48 @@ async function lookupFamily(uid){
 }
 
 async function verifyFamilyMembership(fid, uid){
-  if(!window._fbGet||!isSafeFamilyId(fid)||!uid) return false;
+  if(!isSafeFamilyId(fid)||!uid) return {status:'not-member'};
+  if(window._fbGetStatus){
+    const res=await window._fbGetStatus('families/'+fid+'/members/'+uid);
+    if(!res.ok) return {status:'unknown', error:res.error};
+    return {status:res.exists?'member':'not-member', member:res.data};
+  }
+  if(!window._fbGet) return {status:'unknown'};
   const member=await window._fbGet('families/'+fid+'/members/'+uid);
-  return !!member;
+  return {status:member?'member':'not-member', member};
 }
 
-async function clearInvalidFamilyAccess(fid, uid){
+async function clearInvalidFamilyAccess(fid, uid, opts={}){
   clearFamilyCache(fid);
   try{
     if(localStorage.getItem('bgt_family_id')===fid) localStorage.removeItem('bgt_family_id');
     if(localStorage.getItem('bgt_uid')===uid) localStorage.removeItem('bgt_uid');
   }catch(e){}
-  if(window._fbDelete&&uid){
+  if(opts.deleteRoute&&window._fbDelete&&uid){
     try{ await window._fbDelete('userFamilies/'+uid); }catch(e){}
   }
   if(_familyId===fid) _familyId=null;
   DB={}; PDB={'1':{},'2':{}};
   RECUR=[]; PSUBS={'1':[],'2':[]};
+}
+
+async function recoverKnownFamilyRoute(uid){
+  if(!uid||!window._fbSet) return null;
+  for(const fid of FAMILY_RECOVERY_IDS){
+    const check=await verifyFamilyMembership(fid, uid);
+    if(check.status==='member'){
+      const ok=await window._fbSet('userFamilies/'+uid, {familyId:fid, recoveredAt:Date.now()});
+      if(ok) return fid;
+      if(window._fbDelete){
+        try{
+          await window._fbDelete('userFamilies/'+uid);
+          const retryOk=await window._fbSet('userFamilies/'+uid, {familyId:fid, recoveredAt:Date.now()});
+          if(retryOk) return fid;
+        }catch(e){ console.warn('Family route recovery retry failed:', e); }
+      }
+    }
+  }
+  return null;
 }
 
 async function createFamilyForUser(uid, email){
@@ -4168,17 +4204,26 @@ async function handleAuthState(user){
   if(!famId){
     try{ famId=await lookupFamily(user.uid); }catch(e){ console.warn('Family lookup:', e); }
   }
+  if(!famId){
+    try{ famId=await recoverKnownFamilyRoute(user.uid); }catch(e){ console.warn('Family route recovery:', e); }
+  }
   if(famId){
-    const isMember=await verifyFamilyMembership(famId, user.uid);
-    if(isMember){
+    const membership=await verifyFamilyMembership(famId, user.uid);
+    if(membership.status==='member'){
       _familyId=famId;
       try{ localStorage.setItem('bgt_family_id', famId); localStorage.setItem('bgt_uid', user.uid); }catch(e){}
       cleanupLegacyCache();
       await proceedToApp();
       return;
     }
-    console.warn('Family membership could not be verified; clearing cached family access:', famId);
-    await clearInvalidFamilyAccess(famId, user.uid);
+    if(membership.status==='unknown'){
+      console.warn('Family membership check inconclusive; preserving route for retry:', famId, membership.error);
+      authShowError('Family access could not be verified. Check your connection and try again.', 'family-err');
+      showScreen('family');
+      return;
+    }
+    console.warn('Family membership missing; clearing local cached family access:', famId);
+    await clearInvalidFamilyAccess(famId, user.uid, {deleteRoute:false});
   }
   // No family — check for pending invites against this user's email
   if(user.email){
