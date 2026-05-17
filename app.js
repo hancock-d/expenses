@@ -1,4 +1,4 @@
-/* Family Budget Tracker app logic — extracted from index.html for v2.4.0. */
+/* Family Budget Tracker app logic — extracted from index.html for v2.4.1. */
 /* ════════════════════════════════════════════════
    CONSTANTS
 ════════════════════════════════════════════════ */
@@ -6,7 +6,7 @@ const CATS = ['Groceries / Household','Utilities & Bills','Dining Out','Kids / C
 const MO   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MOS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DEFAULT_PIN = '1234';
-const APP_VERSION = '2.4.0'; // 2026-05-16 — extracted CSS and main app JS
+const APP_VERSION = '2.4.1'; // 2026-05-16 — invite acceptance fallback
 const FAMILY_RECOVERY_IDS = ['fam_3g9178wnsrg2'];
 
 /* ════════════════════════════════════════════════
@@ -2934,6 +2934,7 @@ async function handleAuthState(user){
     await clearInvalidFamilyAccess(famId, user.uid, {deleteRoute:false});
   }
   // No family — check for pending invites against this user's email
+  let inviteLookupMsg='';
   if(user.email){
     try{
       const accepted = await acceptPendingInviteIfAny(user.uid, user.email);
@@ -2944,12 +2945,15 @@ async function handleAuthState(user){
         await proceedToApp();
         return;
       }
-    }catch(e){ console.warn('Pending invite check failed:', e); }
+    }catch(e){
+      console.warn('Pending invite check failed:', e);
+      inviteLookupMsg='Could not check pending invites. Check connection, Firestore rules, or ask for a fresh invite.';
+    }
   }
   // Still no family — first-time-user flow
   const fue=document.getElementById('family-user-email');
   if(fue) fue.textContent=user.email||user.uid;
-  authShowError(famId?'Your family access could not be verified. Ask the owner for a new invite, or create a new family.':'', 'family-err');
+  authShowError(inviteLookupMsg || (famId?'Your family access could not be verified. Ask the owner for a new invite, or create a new family.':''), 'family-err');
   showScreen('family');
 }
 
@@ -2960,12 +2964,41 @@ async function handleAuthState(user){
 // Called from handleAuthState. Looks for a pending invite matching this user's email
 // across all families. If found, joins the family and deletes the invite.
 async function acceptPendingInviteIfAny(uid, email){
-  if(!window._fbQueryGroup) return null;
+  if(!email) return null;
   const lc = email.toLowerCase();
   // Pending invites are stored at families/{fid}/pendingInvites/{email-lowercased}
   // with `email` field also denormalized for queryability.
-  const invites = await window._fbQueryGroup('pendingInvites', 'email', lc);
-  if(!invites || invites.length === 0) return null;
+  let invites = [];
+  let groupLookupFailed = false;
+  if(window._fbQueryGroupStatus){
+    const res = await window._fbQueryGroupStatus('pendingInvites', 'email', lc);
+    if(res.ok) invites = res.docs || [];
+    else groupLookupFailed = true;
+  } else if(window._fbQueryGroup){
+    invites = await window._fbQueryGroup('pendingInvites', 'email', lc);
+  }
+
+  // Tactical fallback for the current family: direct doc read avoids collectionGroup
+  // index/rules surprises and still requires the signed-in email to match the invite doc.
+  if(!invites || invites.length === 0){
+    for(const fid of FAMILY_RECOVERY_IDS){
+      if(!isSafeFamilyId(fid) || !window._fbGetStatus) continue;
+      const path='families/'+fid+'/pendingInvites/'+lc;
+      const direct=await window._fbGetStatus(path);
+      if(direct.ok && direct.exists){
+        invites = [{id:lc, path, ...direct.data}];
+        break;
+      }
+    }
+  }
+
+  if(!invites || invites.length === 0){
+    if(groupLookupFailed) throw new Error('Pending invite lookup failed');
+    return null;
+  }
+  if(groupLookupFailed){
+    console.warn('Pending invite collectionGroup lookup failed; accepted via direct known-family fallback.');
+  }
   // Pick the first one (in practice should only ever be one — invitations are exclusive per email)
   const invite = invites[0];
   // Path looks like: families/{fid}/pendingInvites/{email}
@@ -3089,7 +3122,7 @@ async function inviteMember(){
   if(_familyMembers.find(m => (m.email||'').toLowerCase() === email)){
     _famSetMsg('That person is already in this family.', 'err'); return;
   }
-  btn.disabled = true; btn.textContent = 'Sending…';
+  btn.disabled = true; btn.textContent = 'Saving…';
   try{
     // Doc ID = email so duplicate invites overwrite. Email field denormalized for collectionGroup query.
     const ok = await window._fbSet(_famPath('pendingInvites/'+email), {
@@ -3101,7 +3134,7 @@ async function inviteMember(){
     });
     if(!ok){ _famSetMsg('Could not create invite. Check Firestore rules.', 'err'); return; }
     input.value = '';
-    _famSetMsg('Invite ready. Tell them to sign in with this email and they\'ll be auto-joined.', 'ok');
+    _famSetMsg('Invite saved. No email is sent; have them sign in with this exact email.', 'ok');
   } catch(e){
     console.error('Invite failed:', e);
     _famSetMsg(e.message || 'Invite failed.', 'err');

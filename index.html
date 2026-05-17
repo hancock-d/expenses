@@ -115,18 +115,23 @@ window._fbListenCollection = (path, cb) => {
 };
 
 // CollectionGroup query: find all docs in any collection named `collectionId` where `field == value`.
-// Returns array of {id, path, ...data}. Used for pending-invite lookup by email.
-window._fbQueryGroup = async (collectionId, field, value) => {
+// Status form preserves permission/index errors so invite acceptance can show a useful message.
+window._fbQueryGroupStatus = async (collectionId, field, value) => {
   try {
     const q = query(collectionGroup(db, collectionId), where(field, '==', value));
     const snap = await getDocs(q);
     const out = [];
     snap.forEach(d => out.push({id: d.id, path: d.ref.path, ...d.data()}));
-    return out;
+    return {ok:true, docs:out};
   } catch(e) {
     console.error('FB collectionGroup query failed:', collectionId, field, value, e.code, e.message);
-    return [];
+    return {ok:false, docs:[], error:e};
   }
+};
+// Back-compat wrapper. Returns array of {id, path, ...data}. Used for pending-invite lookup by email.
+window._fbQueryGroup = async (collectionId, field, value) => {
+  const res = await window._fbQueryGroupStatus(collectionId, field, value);
+  return res.docs;
 };
 
 // Auth helpers exposed to non-module script
@@ -637,6 +642,6 @@ window.dispatchEvent(new Event('fb-ready'));
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=2.4.0"></script>
+<script src="app.js?v=2.4.1"></script>
 </body>
 </html>
