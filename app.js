@@ -1,4 +1,4 @@
-/* Family Budget Tracker app logic — extracted from index.html for v2.4.1. */
+/* Family Budget Tracker app logic — extracted from index.html for v2.4.2. */
 /* ════════════════════════════════════════════════
    CONSTANTS
 ════════════════════════════════════════════════ */
@@ -6,7 +6,7 @@ const CATS = ['Groceries / Household','Utilities & Bills','Dining Out','Kids / C
 const MO   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MOS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DEFAULT_PIN = '1234';
-const APP_VERSION = '2.4.1'; // 2026-05-16 — invite acceptance fallback
+const APP_VERSION = '2.4.2'; // 2026-05-16 — mobile Other Expenses fit
 const FAMILY_RECOVERY_IDS = ['fam_3g9178wnsrg2'];
 
 /* ════════════════════════════════════════════════
@@ -3139,7 +3139,7 @@ async function inviteMember(){
     console.error('Invite failed:', e);
     _famSetMsg(e.message || 'Invite failed.', 'err');
   } finally {
-    btn.disabled = false; btn.textContent = 'Send invite';
+    btn.disabled = false; btn.textContent = 'Save invite';
   }
 }
 

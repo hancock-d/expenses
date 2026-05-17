@@ -8,10 +8,11 @@
 <title>Family Budget</title>
 <!-- Cache busting: forces fresh load on every visit -->
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<link rel="manifest" href="manifest.json">
+<link rel="manifest" href="manifest.json?v=2.4.2">
 <meta name="theme-color" content="#1A1410" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#FAF7F2" media="(prefers-color-scheme: light)">
-<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" type="image/png" sizes="64x64" href="ledge-favicon-64.png?v=2.4.2">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=2.4.2">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -146,7 +147,7 @@ window._authSignOut  = () => signOut(auth);
 
 window.dispatchEvent(new Event('fb-ready'));
 </script>
-<link rel="stylesheet" href="styles.css?v=2.4.0">
+<link rel="stylesheet" href="styles.css?v=2.4.2">
 </head>
 <body>
 
@@ -450,7 +451,7 @@ window.dispatchEvent(new Event('fb-ready'));
         <div id="fam-invite-section" style="display:none;flex-direction:column;gap:6px;">
           <div class="fam-invite-row">
             <input type="email" id="fam-invite-email" placeholder="Invite by email…" autocomplete="off" autocapitalize="off" spellcheck="false">
-            <button id="fam-invite-btn" onclick="inviteMember()">Send invite</button>
+            <button id="fam-invite-btn" onclick="inviteMember()">Save invite</button>
           </div>
           <div class="fam-invites-pending" id="fam-pending-list"></div>
         </div>
@@ -642,6 +643,6 @@ window.dispatchEvent(new Event('fb-ready'));
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=2.4.1"></script>
+<script src="app.js?v=2.4.2"></script>
 </body>
 </html>
