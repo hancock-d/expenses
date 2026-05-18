@@ -451,7 +451,7 @@ window.dispatchEvent(new Event('fb-ready'));
         <div id="fam-invite-section" style="display:none;flex-direction:column;gap:6px;">
           <div class="fam-invite-row">
             <input type="email" id="fam-invite-email" placeholder="Invite by email…" autocomplete="off" autocapitalize="off" spellcheck="false">
-            <button id="fam-invite-btn" onclick="inviteMember()">Save invite</button>
+            <button id="fam-invite-btn" onclick="inviteMember()" title="Save a pending invite; no email is sent" aria-label="Save a pending invite; no email is sent">Save invite</button>
           </div>
           <div class="fam-invites-pending" id="fam-pending-list"></div>
         </div>
@@ -643,6 +643,6 @@ window.dispatchEvent(new Event('fb-ready'));
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=2.4.2"></script>
+<script src="app.js?v=2.4.3"></script>
 </body>
 </html>

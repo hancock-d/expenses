@@ -1,4 +1,4 @@
-/* Family Budget Tracker app logic — extracted from index.html for v2.4.2. */
+/* Family Budget Tracker app logic — extracted from index.html for v2.4.3. */
 /* ════════════════════════════════════════════════
    CONSTANTS
 ════════════════════════════════════════════════ */
@@ -6,7 +6,7 @@ const CATS = ['Groceries / Household','Utilities & Bills','Dining Out','Kids / C
 const MO   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MOS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DEFAULT_PIN = '1234';
-const APP_VERSION = '2.4.2'; // 2026-05-16 — mobile Other Expenses fit
+const APP_VERSION = '2.4.3'; // 2026-05-18 — persistent invite instruction
 const FAMILY_RECOVERY_IDS = ['fam_3g9178wnsrg2'];
 
 /* ════════════════════════════════════════════════
@@ -3073,7 +3073,7 @@ function renderFamilySection(){
         return `<div class="fam-pending">
           <div class="fam-pending-info">
             <span class="fam-pending-email">${esc(inv.email||inv.id||'')}</span>
-            <span class="fam-pending-meta">Pending${when?' · sent '+when:''}</span>
+            <span class="fam-pending-meta">Pending${when?' · saved '+when:''}</span>
           </div>
           <button class="fam-member-action fam-revoke-invite" data-invite-id="${esc(inv.id)}">Revoke</button>
         </div>`;
@@ -3098,13 +3098,13 @@ document.addEventListener('click', e=>{
   }
 });
 
-function _famSetMsg(text, kind){
+function _famSetMsg(text, kind, opts={}){
   const el = document.getElementById('fam-msg');
   if(!el) return;
   el.textContent = text || '';
   el.classList.remove('err','ok');
   if(kind) el.classList.add(kind);
-  if(text) setTimeout(()=>{ if(el.textContent===text){ el.textContent=''; el.classList.remove('err','ok'); } }, 4000);
+  if(text && !opts.persist) setTimeout(()=>{ if(el.textContent===text){ el.textContent=''; el.classList.remove('err','ok'); } }, 4000);
 }
 
 async function inviteMember(){
@@ -3134,7 +3134,7 @@ async function inviteMember(){
     });
     if(!ok){ _famSetMsg('Could not create invite. Check Firestore rules.', 'err'); return; }
     input.value = '';
-    _famSetMsg('Invite saved. No email is sent; have them sign in with this exact email.', 'ok');
+    _famSetMsg('Invite saved. No email is sent; have them sign in with this exact email.', 'ok', {persist:true});
   } catch(e){
     console.error('Invite failed:', e);
     _famSetMsg(e.message || 'Invite failed.', 'err');
@@ -3196,6 +3196,14 @@ async function leaveFamilyClick(){
 ════════════════════════════════════════════════ */
 document.getElementById('prevMonth').addEventListener('click',()=>changeMonth(-1));
 document.getElementById('nextMonth').addEventListener('click',()=>changeMonth(1));
+const famInviteEmail = document.getElementById('fam-invite-email');
+if(famInviteEmail){
+  famInviteEmail.addEventListener('keydown', e=>{
+    if(e.key !== 'Enter') return;
+    e.preventDefault();
+    inviteMember();
+  });
+}
 
 (async function(){
   console.log('Family Budget v' + APP_VERSION);
