@@ -6,7 +6,7 @@ const CATS = ['Groceries / Household','Utilities & Bills','Dining Out','Kids / C
 const MO   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MOS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DEFAULT_PIN = '1234';
-const APP_VERSION = '2.5.1'; // 2026-10-02 — month-effective recurring costs
+const APP_VERSION = '2.5.3'; // 2026-10-02 — explicit month targets for saves
 const FAMILY_RECOVERY_IDS = ['fam_3g9178wnsrg2'];
 
 /* ════════════════════════════════════════════════
@@ -316,8 +316,8 @@ function getMD(y,m){
   if(!DB[k].overrides) DB[k].overrides={};
   return DB[k];
 }
-async function saveMD(){
-  const k=mk(Y,M);
+async function saveMD(y=Y,m=M){
+  const k=mk(y,m);
   const data=DB[k];
   // localStorage cache
   _cacheSet(k,JSON.stringify(data));
@@ -628,7 +628,7 @@ function seedMonth(y,m){
     }
   }
   md.seeded=true;
-  if(changed) saveMD();
+  if(changed) saveMD(y,m);
 }
 
 // Compute occurrence dates for biweekly/weekly charges in a given month
@@ -742,8 +742,6 @@ function getCarryByKey(k){
 ════════════════════════════════════════════════ */
 function render(){
   const md=getMD(Y,M);
-  // Clear expense filter
-  const ef=document.getElementById('exp-filter'); if(ef) ef.value='';
   const r=calcMonth(Y,M);
   const carry=getCarry(Y,M);
   const comb=r.balance+carry;
@@ -951,6 +949,7 @@ function renderRecur(){
   document.getElementById('r-count').textContent=cnt;
   document.getElementById('r-total').textContent=`${fmt(tot)}/mo`;
   setZone('r',rOpen);
+  applyCurrentExpenseFilter('r-tbody');
 }
 
 function buildCovLabel(t, viewM, viewY){
@@ -1031,6 +1030,7 @@ function renderCredits(){
   document.getElementById('c-total').textContent=fmt(tot);
   empty.style.display=cnt===0?'block':'none';
   setZone('c',cOpen);
+  applyCurrentExpenseFilter('c-tbody');
 }
 
 function renderExpenses(){
@@ -1099,6 +1099,7 @@ function renderExpenses(){
     expIdx++;
   });
   setZone('e',eOpen);
+  applyCurrentExpenseFilter('e-tbody');
 }
 
 function renderCats(){
@@ -1270,6 +1271,7 @@ function hdrAddPersCredit(){
    ACTIONS
 ════════════════════════════════════════════════ */
 function addRecur(){
+  clearExpenseFilter();
   const t={id:'r'+Date.now(),name:'',paidBy:'1',amount:'',chargeDay:'',
     frequency:'monthly',anchorDate:'',creditAmount:'',creditTo:'',
     covStartRef:'curr',covStartDay:'',covEndRef:'next',covEndDay:'',
@@ -1425,56 +1427,38 @@ function clearOv(id){
   saveMD(); render();
 }
 
-function filterAll(q){
+function filterExpenseTable(id,q){
   const term=q.toLowerCase().trim();
-  // Filter rows in all three tbodies
-  ['r-tbody','e-tbody','c-tbody'].forEach(id=>{
-    const tbody=document.getElementById(id);
-    if(!tbody) return;
-    const rows=tbody.querySelectorAll('tr');
-    for(let r=0;r<rows.length;r++){
-      const row=rows[r];
-      const isSummary=row.classList.contains('rsummary-row')||row.classList.contains('ec-summary-row');
-      const isDetail=row.classList.contains('rdetail-row')||row.classList.contains('ec-detail-row');
-      if(isSummary){
-        const text=(row.textContent||'').toLowerCase();
-        const match=!term||text.includes(term);
-        row.style.display=match?'':'none';
-        // Also toggle the detail row
-        const next=rows[r+1];
-        if(next&&(next.classList.contains('rdetail-row')||next.classList.contains('ec-detail-row'))){
-          if(!match) next.style.display='none';
-          else next.style.display=(next.classList.contains('r-hidden')||next.classList.contains('ec-hidden'))?'none':'';
-        }
-      }
+  const tbody=document.getElementById(id);
+  if(!tbody) return;
+  tbody.querySelectorAll('.rsummary-row,.ec-summary-row').forEach(row=>{
+    const match=!term||(row.textContent||'').toLowerCase().includes(term);
+    row.style.display=match?'':'none';
+    const detail=row.nextElementSibling;
+    if(detail&&(detail.classList.contains('rdetail-row')||detail.classList.contains('ec-detail-row'))){
+      // Filtering hides nonmatches; collapse classes alone control matching detail rows.
+      detail.style.display=match?'':'none';
     }
   });
 }
-
+function applyCurrentExpenseFilter(id){
+  const input=document.getElementById(id.startsWith('ps-')?'pers-filter':'exp-filter');
+  filterExpenseTable(id,input?input.value:'');
+}
+function filterAll(q){
+  ['r-tbody','e-tbody','c-tbody'].forEach(id=>filterExpenseTable(id,q));
+}
 function filterAllPers(q){
-  const term=q.toLowerCase().trim();
-  ['ps-sub-tbody','ps-exp-tbody','ps-c-tbody'].forEach(id=>{
-    const tbody=document.getElementById(id);
-    if(!tbody) return;
-    const rows=tbody.querySelectorAll('tr');
-    for(let r=0;r<rows.length;r++){
-      const row=rows[r];
-      const isSummary=row.classList.contains('rsummary-row')||row.classList.contains('ec-summary-row');
-      if(isSummary){
-        const text=(row.textContent||'').toLowerCase();
-        const match=!term||text.includes(term);
-        row.style.display=match?'':'none';
-        const next=rows[r+1];
-        if(next&&(next.classList.contains('rdetail-row')||next.classList.contains('ec-detail-row'))){
-          if(!match) next.style.display='none';
-          else next.style.display=(next.classList.contains('r-hidden')||next.classList.contains('ec-hidden'))?'none':'';
-        }
-      }
-    }
-  });
+  ['ps-sub-tbody','ps-exp-tbody','ps-c-tbody'].forEach(id=>filterExpenseTable(id,q));
+}
+function clearExpenseFilter(personal=false){
+  const input=document.getElementById(personal?'pers-filter':'exp-filter');
+  if(input) input.value='';
+  if(personal) filterAllPers(''); else filterAll('');
 }
 
 function addExp(){
+  clearExpenseFilter();
   const md=getMD(Y,M); const n=new Date();
   md.expenses.push({date:`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`,desc:'',cat:CATS[0],paidBy:'1',amount:''});
   saveMD(); render();
@@ -1499,6 +1483,7 @@ function updExpPaid(i,v){
 function delExp(i){ const md=getMD(Y,M); md.expenses.splice(i,1); saveMD(); render(); }
 
 function addCredit(){
+  clearExpenseFilter();
   const md=getMD(Y,M); const n=new Date();
   md.credits.push({date:`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`,desc:'',to:'1',amount:''});
   saveMD(); render();
@@ -1643,9 +1628,8 @@ function getPMD(who,y,m){
   if(!PDB[who][k].overrides) PDB[who][k].overrides={};
   return PDB[who][k];
 }
-async function savePMD(who){
-  // NOTE: uses global PY/PM — only safe when called from the currently viewed personal month context
-  const k=mk(PY,PM);
+async function savePMD(who,y=PY,m=PM){
+  const k=mk(y,m);
   const data=PDB[who][k];
   _cacheSet('p'+who+'_'+k, JSON.stringify(data));
   if(window._fbSet && _familyId){ setSyncing(); const ok=await window._fbSet(_famPath('personal_'+who+'/'+k),{data:JSON.stringify(data)}); ok?setSynced():setSyncError(); }
@@ -1711,7 +1695,7 @@ function seedPersonalMonth(who,y,m){
     }
   }
   md.seeded=true;
-  if(changed) savePMD(who);
+  if(changed) savePMD(who,y,m);
 }
 
 // ── Open / Close ─────────────────────────────
@@ -1766,8 +1750,6 @@ function renderPersonal(){
   const who=persWho;
   const pname=who==='1'?name1:name2;
   const color=who==='1'?'var(--p1)':'var(--p2)';
-  // Clear personal filter
-  const pf=document.getElementById('pers-filter'); if(pf) pf.value='';
 
   document.getElementById('pers-name').textContent=pname+"'s Personal Tracker";
   document.getElementById('pers-name').style.color=color;
@@ -1914,6 +1896,7 @@ function renderPersSubs(who){
   document.getElementById('ps-sub-chev').classList.toggle('open',open);
 
   updatePersTotals(who);
+  applyCurrentExpenseFilter('ps-sub-tbody');
 }
 
 function renderPersExps(who){
@@ -1975,6 +1958,7 @@ function renderPersExps(who){
   document.getElementById('ps-exp-body').classList.toggle('open',peOpen);
   document.getElementById('ps-exp-chev').classList.toggle('open',peOpen);
   updatePersTotals(who);
+  applyCurrentExpenseFilter('ps-exp-tbody');
 }
 
 function updatePersTotals(who){
@@ -2044,6 +2028,7 @@ function togglePersZone(){
 }
 
 function addPersSub(){
+  clearExpenseFilter(true);
   if(!PSUBS[persWho]) PSUBS[persWho]=[];
   PSUBS[persWho].push({id:'ps'+Date.now(),name:'',amount:'',notes:'',active:true,
     frequency:'monthly',anchorDate:'',creditAmount:'',
@@ -2132,6 +2117,7 @@ function togglePersActiveMo(who,id,i,mi){
 }
 
 function addPersExp(){
+  clearExpenseFilter(true);
   const md=getPMD(persWho,PY,PM); const n=new Date();
   md.expenses.push({
     date:`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`,
@@ -2227,9 +2213,11 @@ function renderPersCredits(who){
   document.getElementById('ps-c-chev').classList.toggle('open',open);
 
   updatePersTotals(who);
+  applyCurrentExpenseFilter('ps-c-tbody');
 }
 
 function addPersCredit(){
+  clearExpenseFilter(true);
   const md=getPMD(persWho,PY,PM);
   if(!md.credits) md.credits=[];
   const n=new Date();
@@ -2922,6 +2910,7 @@ async function authCreateFamilyClick(){
 }
 
 async function signOutClick(){
+  clearExpenseFilter(); clearExpenseFilter(true);
   // Tear down listeners first so we don't get permission-denied bursts after sign-out
   try{ stopListeners(); }catch(e){}
   if(_invitesUnsub){ try{ _invitesUnsub(); }catch(e){} _invitesUnsub=null; }
