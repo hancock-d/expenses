@@ -1,4 +1,4 @@
-/* Family Budget Tracker app logic — extracted from index.html for v2.4.3. */
+/* Family Budget Tracker app logic — extracted from index.html for v2.4.0. */
 /* ════════════════════════════════════════════════
    CONSTANTS
 ════════════════════════════════════════════════ */
@@ -6,7 +6,7 @@ const CATS = ['Groceries / Household','Utilities & Bills','Dining Out','Kids / C
 const MO   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MOS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DEFAULT_PIN = '1234';
-const APP_VERSION = '2.4.3'; // 2026-05-18 — persistent invite instruction
+const APP_VERSION = '2.5.1'; // 2026-10-02 — month-effective recurring costs
 const FAMILY_RECOVERY_IDS = ['fam_3g9178wnsrg2'];
 
 /* ════════════════════════════════════════════════
@@ -449,6 +449,66 @@ function listenCurrentMonth(){
 /* ════════════════════════════════════════════════
    RECURRING SEED
 ════════════════════════════════════════════════ */
+function hasCost(v){ return v!==undefined && v!==null && v!==''; }
+function sameCost(a,b){ return hasCost(a)&&hasCost(b) ? Number(a)===Number(b) : !hasCost(a)&&!hasCost(b); }
+function usualCost(t,y,m){
+  const month=mk(y,m);
+  let amount=t.amount??'', latest='';
+  for(const change of (t.amountHistory||[])){
+    if(change.from<=month && change.from>latest){ amount=change.amount; latest=change.from; }
+  }
+  return amount;
+}
+function setUsualCost(t,y,m,value){
+  if(hasCost(value) && (!Number.isFinite(Number(value)) || Number(value)<0)){
+    showToast('Enter a cost of zero or more'); return false;
+  }
+  const from=mk(y,m);
+  // Keep the legacy amount as the baseline for months before the first dated change.
+  t.amountHistory=(t.amountHistory||[]).filter(change=>change.from!==from);
+  t.amountHistory.push({from,amount:value});
+  t.amountHistory.sort((a,b)=>a.from.localeCompare(b.from));
+  return true;
+}
+function recurringOverride(t,e,md){
+  const overrides=md.overrides||{};
+  if(e && hasCost(overrides[e.recurId])) return overrides[e.recurId];
+  if(hasCost(overrides[t.id])) return overrides[t.id];
+  // Older personal overrides were stored only on the seeded expense.
+  const baseline=e && e.usualAmount!==undefined ? e.usualAmount : t.amount;
+  return e && hasCost(e.amount) && !sameCost(e.amount,baseline) ? e.amount : '';
+}
+function recurringCost(t,e,md,y,m){
+  const override=recurringOverride(t,e,md);
+  return hasCost(override) ? override : usualCost(t,y,m);
+}
+function expenseAmount(e,md,y,m,templates=RECUR){
+  const t=templates.find(t=>t.id===(e.recurParent||e.recurId||e.subId));
+  return parseFloat(t ? recurringCost(t,e,md,y,m) : e.amount)||0;
+}
+function syncSeedCost(e,t,md,y,m){
+  let changed=false;
+  const baseline=e.usualAmount!==undefined ? e.usualAmount : t.amount;
+  // Record an inferred legacy override before its value can coincide with a new usual cost.
+  if(hasCost(e.amount) && !sameCost(e.amount,baseline) &&
+     !hasCost((md.overrides||{})[e.recurId]) && !hasCost((md.overrides||{})[t.id])){
+    if(!md.overrides) md.overrides={};
+    md.overrides[e.recurId||e.subId||t.id]=e.amount;
+    changed=true;
+  }
+  const amount=recurringCost(t,e,md,y,m), usual=usualCost(t,y,m);
+  if(e.amount!==amount || e.usualAmount!==usual) changed=true;
+  e.amount=amount; e.usualAmount=usual;
+  return changed;
+}
+function recurMonthTotal(t,md,y,m){
+  const multi=t.frequency==='weekly'||t.frequency==='biweekly';
+  const ids=multi ? getRecurDates(t,y,m).map((_,i)=>t.id+'_'+i) : [t.id];
+  return ids.reduce((total,id)=>{
+    const e=md.expenses.find(e=>e.recurId===id);
+    return total+(parseFloat(recurringCost(t,e,md,y,m))||0);
+  },0);
+}
 function seedMonth(y,m){
   const md=getMD(y,m);
   let changed=false;
@@ -482,16 +542,15 @@ function seedMonth(y,m){
           desc:t.name+covStr(t,y,m),
           cat:t.cat||'Utilities & Bills',
           paidBy:t.paidBy||'1',
-          amount:t.amount||'',
+          amount:recurringCost(t,null,md,y,m),
+          usualAmount:usualCost(t,y,m),
           recurId:t.id
         });
         const ams=t.activeMonths;
         if(ams && ams[m]===0) md.skips[t.id]=true;
         changed=true;
       } else {
-        if((!existing.amount || existing.amount==='') && t.amount){
-          existing.amount=t.amount; changed=true;
-        }
+        if(syncSeedCost(existing,t,md,y,m)) changed=true;
         if(existing.paidBy!==t.paidBy && t.paidBy){
           existing.paidBy=t.paidBy; changed=true;
         }
@@ -514,7 +573,8 @@ function seedMonth(y,m){
             desc:t.name+' ('+ordinal(idx+1)+')',
             cat:t.cat||'Utilities & Bills',
             paidBy:t.paidBy||'1',
-            amount:t.amount||'',
+            amount:recurringCost(t,{recurId:rid},md,y,m),
+            usualAmount:usualCost(t,y,m),
             recurId:rid,
             recurParent:t.id
           });
@@ -522,9 +582,7 @@ function seedMonth(y,m){
           if(ams && ams[m]===0) md.skips[t.id]=true;
           changed=true;
         } else {
-          if((!existing.amount || existing.amount==='') && t.amount){
-            existing.amount=t.amount; changed=true;
-          }
+          if(syncSeedCost(existing,t,md,y,m)) changed=true;
           if(existing.paidBy!==t.paidBy && t.paidBy){
             existing.paidBy=t.paidBy; changed=true;
           }
@@ -641,13 +699,7 @@ function calcMonth(y,m){
 
   for(const e of md.expenses){
     if(e.recurId&&(md.skips[e.recurId]||md.skips[e.recurParent])) continue;
-    let a=parseFloat(e.amount)||0;
-    // For recurring charges with no amount, fall back to override then template
-    if(!a && e.recurId){
-      const ov=md.overrides&&md.overrides[e.recurId];
-      if(ov!==undefined && ov!=='') a=parseFloat(ov)||0;
-      if(!a){ const t=RECUR.find(r=>r.id===e.recurId||r.id===e.recurParent); if(t) a=parseFloat(t.amount)||0; }
-    }
+    const a=expenseAmount(e,md,y,m);
     if(!a) continue;
     if(e.paidBy==='1') paid1+=a;
     else if(e.paidBy==='2') paid2+=a;
@@ -756,22 +808,18 @@ function renderRecur(){
   RECUR.forEach((t,i)=>{
     const sk=!!(md.skips&&md.skips[t.id]);
     const freq=t.frequency||'monthly';
-    const ov=md.overrides&&md.overrides[t.id]!==undefined?md.overrides[t.id]:'';
-    const disp=ov!==''?ov:t.amount;
+    const seeded=md.expenses.find(e=>e.recurId===t.id||e.recurParent===t.id);
+    const ov=recurringOverride(t,seeded,md);
+    const usual=usualCost(t,Y,M);
+    const disp=hasCost(ov)?ov:usual;
+    const moTotal=recurMonthTotal(t,md,Y,M);
     if(t.active&&!sk){
       cnt++;
-      if(freq==='weekly'||freq==='biweekly'){
-        const occN=getRecurDates(t,Y,M).length;
-        tot+=(parseFloat(disp)||0)*occN;
-      } else {
-        // monthly, annual, semiannual — 1 occurrence (annual/semiannual only seeded if active this month)
-        tot+=parseFloat(disp)||0;
-      }
+      tot+=moTotal;
     }
     const collapsed=_collapsedRecur.has(i);
     const covLabel=buildCovLabel(t);
     const occ=freq==='weekly'||freq==='biweekly'?getRecurDates(t,Y,M).length:(freq==='annual'||freq==='semiannual'?1:1);
-    const moTotal=(parseFloat(disp)||0)*occ;
     const rowClass=!t.active?'ri':sk?'rskip':'';
 
     // Summary row
@@ -817,8 +865,8 @@ function renderRecur(){
           </div>
           <div class="recur-detail-group">
             <div class="recur-field rnum">
-              <label>Usual Cost</label>
-              <input type="number" value="${esc(t.amount||'')}" placeholder="$0.00" min="0" step="0.01" onchange="updRecurImm(${i},'amount',this.value)">
+              <label>Usual Cost (${MOS[M]} ${Y}+)</label>
+              <input type="number" value="${esc(usual)}" placeholder="$0.00" min="0" step="0.01" onchange="updRecurImm(${i},'amount',this.value)" title="Applies from ${MO[M]} ${Y} onward; earlier months keep their previous cost">
             </div>
             <div class="recur-field rnum">
               <label>Override Cost</label>
@@ -1059,12 +1107,7 @@ function renderCats(){
   const tots={}; CATS.forEach(c=>tots[c]=0);
   for(const e of md.expenses){
     if(e.recurId&&(md.skips[e.recurId]||md.skips[e.recurParent])) continue;
-    let a=parseFloat(e.amount)||0;
-    if(!a && e.recurId){
-      const ov=md.overrides&&md.overrides[e.recurId];
-      if(ov!==undefined && ov!=='') a=parseFloat(ov)||0;
-      if(!a){ const t=RECUR.find(r=>r.id===e.recurId||r.id===e.recurParent); if(t) a=parseFloat(t.amount)||0; }
-    }
+    const a=expenseAmount(e,md,Y,M);
     tots[CATS.includes(e.cat)?e.cat:'Other']+=a;
   }
 
@@ -1083,12 +1126,7 @@ function renderCats(){
     if(smd){
       for(const e of (smd.expenses||[])){
         if(e.recurId&&smd.skips&&(smd.skips[e.recurId]||smd.skips[e.recurParent])) continue;
-        let a=parseFloat(e.amount)||0;
-        if(!a && e.recurId){
-          const ov=smd.overrides&&smd.overrides[e.recurId];
-          if(ov!==undefined && ov!=='') a=parseFloat(ov)||0;
-          if(!a){ const t=RECUR.find(r=>r.id===e.recurId||r.id===e.recurParent); if(t) a=parseFloat(t.amount)||0; }
-        }
+        const a=expenseAmount(e,smd,y,m);
         catTots[CATS.includes(e.cat)?e.cat:'Other']+=a;
       }
     }
@@ -1247,6 +1285,12 @@ function addRecur(){
 }
 // updRecurImm: re-renders table (safe for selects/checkbox where focus doesn't matter)
 function updRecurImm(i,f,v){
+  if(f==='amount'){
+    if(!setUsualCost(RECUR[i],Y,M,v)){ renderRecur(); return; }
+    saveMeta(); seedMonth(Y,M); render();
+    showToast('Usual cost saved from '+MOS[M]+' '+Y+' onward');
+    return;
+  }
   RECUR[i][f]=v; saveMeta();
   // If frequency or anchorDate changed, re-seed the month
   if(f==='frequency'||f==='anchorDate'){
@@ -1276,13 +1320,12 @@ function updRecurImm(i,f,v){
     return;
   }
   // Sync seeded expense(s) and auto-credits in the current month for fields that affect generated rows.
-  if(f==='amount'||f==='paidBy'||f==='name'||f==='cat'||f==='payment'||f==='creditAmount'||f==='creditTo'){
+  if(f==='paidBy'||f==='name'||f==='cat'||f==='payment'||f==='creditAmount'||f==='creditTo'){
     const md=getMD(Y,M);
     const tid=RECUR[i].id;
     for(const e of md.expenses){
       // Match both direct recurId and recurParent (for weekly/biweekly)
       if(e.recurId===tid || e.recurParent===tid){
-        if(f==='amount') e.amount=v;
         if(f==='paidBy') e.paidBy=v;
         if(f==='cat') e.cat=v;
         if(f==='name'){
@@ -1302,7 +1345,10 @@ function updRecurImm(i,f,v){
   renderRecur(); partialSummary();
 }
 // updRecur: saves only, no re-render — preserves focus while typing in text/number fields
-function updRecur(i,f,v){ RECUR[i][f]=v; saveMeta(); partialSummary(); }
+function updRecur(i,f,v){
+  if(f==='amount'){ updRecurImm(i,f,v); return; }
+  RECUR[i][f]=v; saveMeta(); partialSummary();
+}
 function delRecur(i){
   const tid=RECUR[i].id;
   RECUR.splice(i,1);
@@ -1345,21 +1391,37 @@ function toggleSkip(id){
   const md=getMD(Y,M); md.skips[id]=!md.skips[id]; saveMD(); render();
 }
 function setOv(id,val){
-  const md=getMD(Y,M); md.overrides[id]=val===''?undefined:val;
-  for(const e of md.expenses){ if(e.recurId===id){e.amount=val;break;} }
+  const md=getMD(Y,M);
+  if(hasCost(val)) md.overrides[id]=val; else delete md.overrides[id];
+  const t=RECUR.find(t=>t.id===id);
+  if(t){
+    for(const e of md.expenses){
+      if(e.recurId===id||e.recurParent===id){
+        if(e.recurId!==id) delete md.overrides[e.recurId];
+        e.amount=hasCost(val)?val:usualCost(t,Y,M); e.usualAmount=usualCost(t,Y,M);
+      }
+    }
+  }
   saveMD(); partialSummary(); renderCats(); renderHistory();
   // Update badge only — no full table re-render so Actual Cost field keeps focus
   let _cnt=0,_tot=0;
   const _md=getMD(Y,M);
   RECUR.forEach(t=>{ if(!t.active||((_md.skips||{})[t.id])) return; _cnt++;
-    const _ov=(_md.overrides||{})[t.id]; _tot+=parseFloat(_ov!==undefined?_ov:t.amount)||0; });
+    _tot+=recurMonthTotal(t,_md,Y,M); });
   document.getElementById('r-count').textContent=_cnt;
   document.getElementById('r-total').textContent=fmt(_tot)+'/mo';
 }
 function clearOv(id){
   const md=getMD(Y,M); delete md.overrides[id];
   const t=RECUR.find(r=>r.id===id);
-  if(t){ for(const e of md.expenses){if(e.recurId===id){e.amount=t.amount;break;}} }
+  if(t){
+    for(const e of md.expenses){
+      if(e.recurId===id||e.recurParent===id){
+        delete md.overrides[e.recurId];
+        e.amount=usualCost(t,Y,M); e.usualAmount=usualCost(t,Y,M);
+      }
+    }
+  }
   saveMD(); render();
 }
 
@@ -1612,15 +1674,13 @@ function seedPersonalMonth(who,y,m){
     if(!existing){
       md.expenses.push({
         date:'',desc:t.name,cat:'Subscriptions',paidBy:who,
-        amount:t.amount||'',subId:t.id,isSubSeed:true
+        amount:recurringCost(t,null,md,y,m),usualAmount:usualCost(t,y,m),subId:t.id,isSubSeed:true
       });
       const ams=t.activeMonths;
       if(ams && ams[m]===0) md.skips[t.id]=true;
       changed=true;
     } else {
-      if((!existing.amount || existing.amount==='') && t.amount){
-        existing.amount=t.amount; changed=true;
-      }
+      if(syncSeedCost(existing,t,md,y,m)) changed=true;
     }
   }
   // Auto-seed credits from personal subs with creditAmount
@@ -1729,13 +1789,14 @@ function renderPersSubs(who){
   (PSUBS[who]||[]).forEach((t,i)=>{
     const sk=!!(md.skips&&md.skips[t.id]);
     const seeded=md.expenses.find(e=>e.subId===t.id);
-    const ov=seeded&&seeded.amount!==t.amount&&seeded.amount!==''?seeded.amount:'';
-    const disp=ov!==''?ov:t.amount;
+    const ov=recurringOverride(t,seeded,md);
+    const usual=usualCost(t,PY,PM);
+    const disp=hasCost(ov)?ov:usual;
     if(t.active&&!sk){cnt++;tot+=parseFloat(disp)||0;}
     const collapsed=_collapsedPRecur.has(i);
     const covLabel=buildCovLabel(t,PM,PY);
     const pFreq=t.frequency||'monthly';
-    const pDisp=ov!==''?ov:t.amount;
+    const pDisp=disp;
     const pMoTotal=(pFreq==='weekly')?(parseFloat(pDisp)||0)*4.33:(pFreq==='biweekly')?(parseFloat(pDisp)||0)*2.17:(parseFloat(pDisp)||0);
     const rowClass=!t.active?'ri':sk?'rskip':'';
 
@@ -1763,8 +1824,8 @@ function renderPersSubs(who){
         <div class="recur-detail-panel">
           <div class="recur-detail-group">
             <div class="recur-field rnum">
-              <label>Usual Cost</label>
-              <input type="number" value="${esc(t.amount||'')}" placeholder="$0.00" min="0" step="0.01" onchange="updPSub('${who}',${i},'amount',this.value)" title="Usual monthly cost">
+              <label>Usual Cost (${MOS[PM]} ${PY}+)</label>
+              <input type="number" value="${esc(usual)}" placeholder="$0.00" min="0" step="0.01" onchange="updPSub('${who}',${i},'amount',this.value)" title="Applies from ${MO[PM]} ${PY} onward; earlier months keep their previous cost">
             </div>
             <div class="recur-field rnum">
               <label>Override Cost</label>
@@ -1924,8 +1985,7 @@ function updatePersTotals(who){
     if(!t.active) return;
     if(md.skips&&md.skips[t.id]) return;
     const seeded=md.expenses.find(e=>e.subId===t.id);
-    const ov=seeded&&seeded.amount!==''?seeded.amount:t.amount;
-    subTot+=parseFloat(ov)||0;
+    subTot+=parseFloat(recurringCost(t,seeded,md,PY,PM))||0;
   });
   // other expenses total
   const expTot=md.expenses.filter(e=>!e.isSubSeed).reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
@@ -1962,7 +2022,7 @@ function renderPersHist(who){
       if(!t.active) return;
       if(md.skips&&md.skips[t.id]) return;
       const seeded=(md.expenses||[]).find(e=>e.subId===t.id);
-      const amt=seeded&&seeded.amount!==''?seeded.amount:t.amount;
+      const amt=recurringCost(t,seeded,md,parseInt(yr),m);
       subTot+=parseFloat(amt)||0;
     });
     const expTot=(md.expenses||[]).filter(e=>!e.isSubSeed).reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
@@ -1994,6 +2054,13 @@ function addPersSub(){
   renderPersSubs(persWho); renderPersHist(persWho);
 }
 function updPSub(who,i,f,v){
+  if(f==='amount'){
+    if(!setUsualCost(PSUBS[who][i],PY,PM,v)){ renderPersSubs(who); return; }
+    savePMeta(); seedPersonalMonth(who,PY,PM);
+    renderPersSubs(who); renderPersHist(who);
+    showToast('Usual cost saved from '+MOS[PM]+' '+PY+' onward');
+    return;
+  }
   PSUBS[who][i][f]=v; savePMeta();
   if(f==='frequency'||f==='anchorDate'){
     // Auto-set activeMonths for annual/semiannual
@@ -2029,15 +2096,18 @@ function delPSub(who,i){
 }
 function setPersOv(who,id,val){
   const md=getPMD(who,PY,PM);
+  if(hasCost(val)) md.overrides[id]=val; else delete md.overrides[id];
   const seeded=md.expenses.find(e=>e.subId===id);
-  if(seeded) seeded.amount=val;
+  const t=(PSUBS[who]||[]).find(s=>s.id===id);
+  if(seeded&&t){ seeded.amount=hasCost(val)?val:usualCost(t,PY,PM); seeded.usualAmount=usualCost(t,PY,PM); }
   savePMD(who); renderPersSubs(who); renderPersHist(who);
 }
 function clearPersOv(who,id){
   const md=getPMD(who,PY,PM);
+  delete md.overrides[id];
   const seeded=md.expenses.find(e=>e.subId===id);
   const t=(PSUBS[who]||[]).find(s=>s.id===id);
-  if(seeded&&t) seeded.amount=t.amount;
+  if(seeded&&t){ seeded.amount=usualCost(t,PY,PM); seeded.usualAmount=usualCost(t,PY,PM); }
   savePMD(who); renderPersSubs(who); renderPersHist(who);
 }
 
@@ -2232,6 +2302,8 @@ function runDevTests(){
     assert('mk zero-pads months', mk(2026,0)==='2026-01');
     assert('invite email rejects path separators', isValidInviteEmail('test@example.com')&&!isValidInviteEmail('bad/name@example.com'));
     assert('family id accepts only app-generated ids', isSafeFamilyId('fam_3g9178wnsrg2')&&!isSafeFamilyId('fam_bad/path'));
+    assert('google auth helpers exposed', typeof window._authSignInGoogle==='function'&&typeof window._authLinkGoogle==='function'&&typeof window._authProviderIds==='function');
+    assert('google auth buttons exist', !!document.getElementById('auth-google-btn')&&!!document.getElementById('account-google-btn'));
     assert('chargeDate clamps month end', chargeDate(31,2026,1)==='2026-02-28');
     const weekly=getRecurDates({frequency:'weekly',anchorDate:'2026-04-01'},2026,3);
     assert('weekly recurrence dates', weekly.length===5&&weekly[0]==='2026-04-01'&&weekly[4]==='2026-04-29', weekly.join(','));
@@ -2255,6 +2327,25 @@ function runDevTests(){
     DB['2026-04'].skips={r1:true};
     const skipped=calcMonth(2026,3);
     assert('calcMonth excludes skipped recurring', approx(skipped.paid1,100)&&approx(skipped.net1,75)&&approx(skipped.balance,30), JSON.stringify(skipped));
+    const price={id:'price-test',amount:'13'};
+    setUsualCost(price,2026,8,'15');
+    assert('price change preserves earlier months', usualCost(price,2026,7)==='13');
+    assert('price change starts in selected month and carries forward', usualCost(price,2026,8)==='15'&&usualCost(price,2026,9)==='15'&&usualCost(price,2027,0)==='15');
+    setUsualCost(price,2027,0,'17');
+    setUsualCost(price,2026,8,'14');
+    assert('price correction keeps later scheduled changes', price.amountHistory.length===2&&usualCost(price,2026,9)==='14'&&usualCost(price,2027,0)==='17');
+    const legacy={recurId:price.id,amount:'13',paidBy:'1'};
+    const legacyMonth={expenses:[legacy],credits:[],skips:{},overrides:{}};
+    assert('existing future charge uses dated cost', recurringCost(price,legacy,legacyMonth,2026,9)==='14');
+    assert('legacy actual cost remains an override', recurringCost(price,{subId:price.id,amount:'9'},legacyMonth,2026,9)==='9');
+    legacyMonth.overrides[price.id]='0';
+    assert('zero override does not fall back to usual cost', recurringCost(price,legacy,legacyMonth,2026,9)==='0');
+    RECUR=[price]; DB={'2026-10':legacyMonth};
+    assert('zero override is respected in totals', calcMonth(2026,9).total===0);
+    delete legacyMonth.overrides[price.id];
+    assert('dated cost is respected in totals', calcMonth(2026,9).total===14);
+    const restoredPrice=JSON.parse(JSON.stringify(price));
+    assert('price history survives JSON round trip', usualCost(restoredPrice,2026,7)==='13'&&usualCost(restoredPrice,2027,0)==='17');
     console.table(results);
     showToast('Dev tests passed');
     return true;
@@ -2306,13 +2397,9 @@ function exportCSV(){
     if(!md) return;
     (md.expenses||[]).forEach(e => {
       const isRecur = !!e.recurId;
-      const skipped = isRecur && md.skips && md.skips[e.recurId] ? 'yes' : '';
-      let amt = parseFloat(e.amount)||0;
-      if(!amt && isRecur){
-        const ov = md.overrides && md.overrides[e.recurId];
-        if(ov!==undefined && ov!=='') amt = parseFloat(ov)||0;
-        if(!amt){ const t = RECUR.find(r=>r.id===e.recurId); if(t) amt = parseFloat(t.amount)||0; }
-      }
+      const skipped = isRecur && md.skips && (md.skips[e.recurId]||md.skips[e.recurParent]) ? 'yes' : '';
+      const [yr,mo]=k.split('-').map(Number);
+      const amt=expenseAmount(e,md,yr,mo-1);
       rows.push([
         isRecur?'Recurring':'Expense', 'Joint', k, e.date||'', e.desc||'',
         e.cat||'', nameOf(e.paidBy), e.payment||'', amt.toFixed(2), e.notes||'', skipped
@@ -2336,11 +2423,8 @@ function exportCSV(){
       (md.expenses||[]).forEach(e => {
         const isSub = !!e.isSubSeed;
         const skipped = isSub && md.skips && md.skips[e.subId] ? 'yes' : '';
-        let amt = parseFloat(e.amount)||0;
-        if(!amt && isSub){
-          const t = (PSUBS[who]||[]).find(s=>s.id===e.subId);
-          if(t) amt = parseFloat(t.amount)||0;
-        }
+        const [yr,mo]=k.split('-').map(Number);
+        const amt=expenseAmount(e,md,yr,mo-1,PSUBS[who]||[]);
         rows.push([
           isSub?'Subscription':'Expense', pname, k, e.date||'', e.desc||'',
           e.cat||'', pname, e.payment||'', amt.toFixed(2), e.notes||'', skipped
@@ -2482,6 +2566,14 @@ function _friendlyAuthError(e){
   if(code==='auth/network-request-failed')  return 'Network error — check your connection.';
   if(code==='auth/invalid-action-code')     return 'This sign-in link is invalid or already used.';
   if(code==='auth/expired-action-code')     return 'This sign-in link has expired. Request a new one.';
+  if(code==='auth/popup-closed-by-user')     return 'Google sign-in was cancelled.';
+  if(code==='auth/cancelled-popup-request')  return 'Google sign-in was cancelled.';
+  if(code==='auth/popup-blocked')            return 'Pop-up blocked. Allow pop-ups for this site, or use the email link.';
+  if(code==='auth/operation-not-allowed')    return 'Google sign-in is not enabled in Firebase yet.';
+  if(code==='auth/unauthorized-domain')      return 'This domain is not authorized for Google sign-in in Firebase.';
+  if(code==='auth/account-exists-with-different-credential') return 'That email already uses another sign-in method. Sign in with your email link first, then connect Google from Backup & Export.';
+  if(code==='auth/credential-already-in-use') return 'That Google account is already connected to another app account.';
+  if(code==='auth/provider-already-linked')  return 'Google is already connected.';
   if(code==='permission-denied')            return 'Permission denied. Try signing out and back in.';
   return (e&&e.message)||'Something went wrong. Try again.';
 }
@@ -2636,6 +2728,61 @@ async function authSendLink(){
   }finally{
     sendBtn.disabled=false;
     sendBtn.textContent='Send sign-in link';
+  }
+}
+
+function _hasGoogleProvider(){
+  if(!window._authProviderIds) return false;
+  try{ return window._authProviderIds().includes('google.com'); }catch(e){ return false; }
+}
+
+function updateGoogleLinkButton(){
+  const btn=document.getElementById('account-google-btn');
+  if(!btn) return;
+  btn.style.display = (_currentUser && !_hasGoogleProvider()) ? 'inline-flex' : 'none';
+}
+
+async function authSignInWithGoogle(){
+  authShowError('');
+  const btn=document.getElementById('auth-google-btn');
+  if(!window._authSignInGoogle){
+    authShowError('Google sign-in is not ready. Use the email link for now.');
+    return;
+  }
+  if(btn){ btn.disabled=true; btn.querySelector('span:last-child').textContent='Opening Google…'; }
+  try{
+    await window._authSignInGoogle();
+    authStageCompleting();
+    // _authOnState fires next and routes to family/PIN/app.
+  }catch(e){
+    console.error('Google sign-in failed:', e);
+    authShowError(_friendlyAuthError(e));
+    authStageInput();
+  }finally{
+    if(btn){ btn.disabled=false; btn.querySelector('span:last-child').textContent='Continue with Google'; }
+  }
+}
+
+async function linkGoogleClick(){
+  const btn=document.getElementById('account-google-btn');
+  if(!_currentUser){
+    showToast('Sign in first');
+    return;
+  }
+  if(!window._authLinkGoogle){
+    showToast('Google linking is not ready');
+    return;
+  }
+  if(btn){ btn.disabled=true; btn.textContent='Connecting…'; }
+  try{
+    await window._authLinkGoogle();
+    updateGoogleLinkButton();
+    showToast('Google connected');
+  }catch(e){
+    console.error('Connect Google failed:', e);
+    showToast(_friendlyAuthError(e));
+  }finally{
+    if(btn){ btn.disabled=false; btn.textContent='Connect Google'; }
   }
 }
 
@@ -2807,6 +2954,7 @@ async function signOutClick(){
   const pendingEl=document.getElementById('fam-pending-list'); if(pendingEl) pendingEl.innerHTML='';
   const invSec=document.getElementById('fam-invite-section'); if(invSec) invSec.style.display='none';
   const leaveBtn=document.getElementById('fam-leave-btn'); if(leaveBtn) leaveBtn.style.display='none';
+  updateGoogleLinkButton();
   authResetToInput();
   showScreen('auth');
 }
@@ -2868,6 +3016,7 @@ async function proceedToApp(){
   // Update account email
   const ae=document.getElementById('account-email');
   if(ae && _currentUser) ae.textContent=_currentUser.email||_currentUser.uid;
+  updateGoogleLinkButton();
   // PIN gate (session-scoped bypass)
   if(sessionStorage.getItem('bgt_unlocked')==='1'){
     // Already unlocked — wait for data, then show app
@@ -2896,6 +3045,7 @@ async function handleAuthState(user){
     _isOwner=false;
     try{ localStorage.removeItem('bgt_family_id'); localStorage.removeItem('bgt_uid'); }catch(e){}
     const ae=document.getElementById('account-email'); if(ae) ae.textContent='—';
+    updateGoogleLinkButton();
     showScreen('auth');
     authStageInput();
     return;

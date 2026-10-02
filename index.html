@@ -24,7 +24,8 @@ import { getFirestore, doc, getDoc, setDoc, deleteDoc, onSnapshot,
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import {
   getAuth, sendSignInLinkToEmail, signInWithEmailLink, isSignInWithEmailLink,
-  onAuthStateChanged, signOut, setPersistence, browserLocalPersistence
+  onAuthStateChanged, signOut, setPersistence, browserLocalPersistence,
+  GoogleAuthProvider, signInWithPopup, linkWithPopup
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
@@ -142,12 +143,23 @@ window._authSendLink = async (email, redirectUrl) => {
 };
 window._authIsLink   = (url) => isSignInWithEmailLink(auth, url);
 window._authComplete = (email, url) => signInWithEmailLink(auth, email, url);
+function googleProvider(){
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({prompt:'select_account'});
+  return provider;
+}
+window._authSignInGoogle = () => signInWithPopup(auth, googleProvider());
+window._authLinkGoogle = () => {
+  if(!auth.currentUser) throw new Error('Not signed in');
+  return linkWithPopup(auth.currentUser, googleProvider());
+};
+window._authProviderIds = () => auth.currentUser ? auth.currentUser.providerData.map(p => p.providerId) : [];
 window._authOnState  = (cb) => onAuthStateChanged(auth, cb);
 window._authSignOut  = () => signOut(auth);
 
 window.dispatchEvent(new Event('fb-ready'));
 </script>
-<link rel="stylesheet" href="styles.css?v=2.4.2">
+<link rel="stylesheet" href="styles.css?v=2.5.0">
 </head>
 <body>
 
@@ -156,7 +168,12 @@ window.dispatchEvent(new Event('fb-ready'));
   <h1>Family <span>Budget</span></h1>
   <div class="auth-card">
     <div id="auth-stage-input" class="auth-stage">
-      <p class="auth-blurb">Sign in with your email. We'll send you a one-tap link — no password needed.</p>
+      <p class="auth-blurb">Sign in with Google or use an email link. No password needed.</p>
+      <button class="auth-btn-google" id="auth-google-btn" onclick="authSignInWithGoogle()" aria-label="Continue with Google">
+        <span class="auth-google-mark" aria-hidden="true">G</span>
+        <span>Continue with Google</span>
+      </button>
+      <div class="auth-divider"><span>or use email</span></div>
       <input type="email" id="auth-email" placeholder="your@email.com" autocomplete="email" inputmode="email" autocapitalize="off" spellcheck="false">
       <button class="auth-btn" id="auth-send-btn" onclick="authSendLink()">Send sign-in link</button>
       <p class="auth-err" id="auth-err"></p>
@@ -463,7 +480,10 @@ window.dispatchEvent(new Event('fb-ready'));
           <span class="dt-account-label">Signed in</span>
           <span class="dt-account-email" id="account-email">—</span>
         </div>
-        <button class="dt-btn dt-signout" onclick="confirmDel(this,()=>signOutClick())">Sign out</button>
+        <div class="dt-account-actions">
+          <button class="dt-btn dt-google" id="account-google-btn" onclick="linkGoogleClick()" style="display:none;">Connect Google</button>
+          <button class="dt-btn dt-signout" onclick="confirmDel(this,()=>signOutClick())">Sign out</button>
+        </div>
       </div>
       <p class="dt-version">v<span id="dt-version">1.0.0</span></p>
     </div>
@@ -643,6 +663,6 @@ window.dispatchEvent(new Event('fb-ready'));
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=2.4.3"></script>
+<script src="app.js?v=2.5.1"></script>
 </body>
 </html>
