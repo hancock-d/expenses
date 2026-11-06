@@ -6,7 +6,7 @@ const CATS = ['Groceries / Household','Utilities & Bills','Dining Out','Kids / C
 const MO   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MOS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DEFAULT_PIN = '1234';
-const APP_VERSION = '2.5.3'; // 2026-10-02 — explicit month targets for saves
+const APP_VERSION = '2.6.1'; // 2026-11-06 — optional balances/credits and collapsed month views
 const FAMILY_RECOVERY_IDS = ['fam_3g9178wnsrg2'];
 
 /* ════════════════════════════════════════════════
@@ -17,6 +17,40 @@ let DB = {};
 let RECUR = [];
 let name1='Person 1', name2='Person 2';
 let rOpen=true, cOpen=false, eOpen=true;
+let viewPrefs={showBalances:false,applyCredits:true};
+
+function loadViewPrefs(){
+  viewPrefs={showBalances:false,applyCredits:true};
+  if(!_familyId) return;
+  try{
+    const saved=JSON.parse(_cacheGet('view_prefs')||'{}');
+    for(const key of Object.keys(viewPrefs)) if(typeof saved?.[key]==='boolean') viewPrefs[key]=saved[key];
+  }catch(e){}
+}
+function setViewPref(key,value){
+  if(!['showBalances','applyCredits'].includes(key)||typeof value!=='boolean') return;
+  viewPrefs[key]=value;
+  if(_familyId) _cacheSet('view_prefs',JSON.stringify(viewPrefs));
+  render();
+  if(document.getElementById('pers-overlay').classList.contains('open')) renderPersonal();
+}
+function renderViewPrefs(){
+  document.getElementById('show-balances').checked=viewPrefs.showBalances;
+  document.getElementById('apply-credits').checked=viewPrefs.applyCredits;
+  document.getElementById('pers-apply-credits').checked=viewPrefs.applyCredits;
+  document.getElementById('balCard').hidden=!viewPrefs.showBalances;
+  document.getElementById('joint-summary').classList.toggle('without-balances',!viewPrefs.showBalances);
+  for(const id of ['balance-history-head','carry-history-head','status-history-head']) document.getElementById(id).hidden=!viewPrefs.showBalances;
+  const basis=viewPrefs.applyCredits?'after credits':'before credits';
+  document.getElementById('p1-credit-basis').textContent='total, '+basis;
+  document.getElementById('p2-credit-basis').textContent='total, '+basis;
+  document.getElementById('credit-basis').textContent=basis;
+  document.getElementById('pers-credit-basis').textContent='all personal, '+basis;
+  document.getElementById('ps-history-credit-label').textContent=viewPrefs.applyCredits?'Credits':'Credits (excluded)';
+  const settle=document.getElementById('settle-btn');
+  settle.disabled=!viewPrefs.applyCredits;
+  settle.title=viewPrefs.applyCredits?'Change settlement status':'Apply credits before changing settlement status';
+}
 
 // Auth + family state
 let _currentUser = null;    // Firebase user object (set after sign-in)
@@ -71,44 +105,83 @@ function clearFamilyCache(fid){
     Object.keys(localStorage).forEach(k=>{ if(k.startsWith(p)) localStorage.removeItem(k); });
   }catch(e){}
 }
-// Track collapsed row indices across re-renders
+// Collapse keys include family/page and, for transactions, month. Never use row positions.
 let _collapsedRecur=new Set();
 let _collapsedExp=new Set();
 let _collapsedCred=new Set();
 let _collapsedPRecur=new Set();
 let _collapsedPExp=new Set();
 let _collapsedPCred=new Set();
-// 3f: Always start with all rows collapsed on fresh boot. Within-session toggles still
-// persist to localStorage (so switching months and coming back preserves state), but
-// the saved state is intentionally ignored on next app open via collapseAllForCurrentData().
-function collapseAllForCurrentData(){
-  _collapsedRecur.clear(); _collapsedExp.clear(); _collapsedCred.clear();
-  _collapsedPRecur.clear(); _collapsedPExp.clear(); _collapsedPCred.clear();
-  // Joint recurring templates
-  for(let i=0;i<RECUR.length;i++) _collapsedRecur.add(i);
-  // Joint expenses + credits for current month
-  const jk = mk(Y,M);
-  const jmd = DB[jk];
-  if(jmd){
-    const credLen = (jmd.credits||[]).length;
-    for(let i=0;i<credLen;i++) _collapsedCred.add(i);
-    // expenses: skip seeded recurring; only count non-recurring (matches render-time logic)
-    const oneOff = (jmd.expenses||[]).filter(e => !e.recurId && !e.recurParent);
-    for(let i=0;i<oneOff.length;i++) _collapsedExp.add(i);
-  }
-  // Personal: collapse both pages' subs + current month expenses/credits.
-  // PRecur/PExp/PCred sets are shared across the two personal pages (only one open at a time).
-  // Use the larger set of indices so neither page has expanded rows when first opened.
-  const maxPsubs = Math.max((PSUBS['1']||[]).length, (PSUBS['2']||[]).length);
-  for(let i=0;i<maxPsubs;i++) _collapsedPRecur.add(i);
-  // Don't pre-populate personal expenses/credits since they're per-user-per-month and
-  // we don't know which page will open first. Will populate lazily on first personal-page render.
+let _seenCollapseRows=new Set();
+function rowCollapseSet(type){
+  return {recur:_collapsedRecur,exp:_collapsedExp,cred:_collapsedCred,precur:_collapsedPRecur,pexp:_collapsedPExp,pcred:_collapsedPCred}[type];
 }
-function _saveCollapsed(){
-  try{localStorage.setItem('bgt_collapsed',JSON.stringify({
-    r:[..._collapsedRecur],e:[..._collapsedExp],c:[..._collapsedCred],
-    pr:[..._collapsedPRecur],pe:[..._collapsedPExp],pc:[..._collapsedPCred]
-  }));}catch(e){}
+function rowCollapseScope(type,who=persWho){
+  const personal=type.startsWith('p');
+  const month=mk(personal?PY:Y,personal?PM:M);
+  return JSON.stringify([_familyId,personal?String(who):'main',type,month])+':';
+}
+function rowCollapseKey(type,item,who=persWho){
+  return rowCollapseScope(type,who)+JSON.stringify([item.recurCreditId?'auto':'item',item.recurCreditId||item.id]);
+}
+function prepareCollapsedRows(type,items,who=persWho,collapse=false){
+  const set=rowCollapseSet(type), scope=rowCollapseScope(type,who);
+  const keys=new Set(items.map(item=>rowCollapseKey(type,item,who)));
+  for(const key of _seenCollapseRows){
+    if(key.startsWith(scope)&&!keys.has(key)){ _seenCollapseRows.delete(key);set.delete(key); }
+  }
+  for(const key of keys){
+    if(collapse||!_seenCollapseRows.has(key)) set.add(key);
+    _seenCollapseRows.add(key);
+  }
+}
+function expandNewRow(type,item,who=persWho){
+  const key=rowCollapseKey(type,item,who);
+  _seenCollapseRows.add(key);rowCollapseSet(type).delete(key);
+}
+function resetCollapseState(){
+  for(const type of ['recur','exp','cred','precur','pexp','pcred']) rowCollapseSet(type).clear();
+  _seenCollapseRows.clear();
+}
+// Fresh boots and personal-page opens still start collapsed; navigation preserves session state.
+function collapseAllForCurrentData(){
+  resetCollapseState();
+  const md=getMD(Y,M);
+  prepareCollapsedRows('recur',RECUR,'',true);
+  prepareCollapsedRows('exp',md.expenses.filter(e=>!e.recurId),'',true);
+  prepareCollapsedRows('cred',md.credits,'',true);
+  for(const who of ['1','2']){
+    if(Number.isInteger(PY)&&Number.isInteger(PM)) collapsePersonalRows(who);
+  }
+}
+function collapsePersonalRows(who){
+  const md=getPMD(who,PY,PM);
+  prepareCollapsedRows('precur',PSUBS[who]||[],who,true);
+  prepareCollapsedRows('pexp',md.expenses.filter(e=>!e.isSubSeed),who,true);
+  prepareCollapsedRows('pcred',md.credits,who,true);
+}
+let _itemIdCounter=0;
+function newItemId(prefix='i'){
+  return prefix+(globalThis.crypto?.randomUUID?.()||Date.now().toString(36)+'_'+(++_itemIdCounter)+'_'+Math.random().toString(36).slice(2));
+}
+function ensureRowIds(items){
+  const reserved=new Set(items.map(item=>item.id)), seen=new Set();
+  for(const item of items){
+    if(item.recurId||item.recurParent||item.isSubSeed||item.recurCreditId) continue;
+    if(typeof item.id==='string'&&item.id&&!seen.has(item.id)){ seen.add(item.id); continue; }
+    // Deterministic legacy identities survive identical unmodified snapshots without read-triggered writes.
+    const fields=Object.fromEntries(Object.keys(item).filter(k=>k!=='id').sort().map(k=>[k,item[k]]));
+    const text=JSON.stringify(fields);
+    let a=2166136261,b=5381;
+    for(let i=0;i<text.length;i++){ a=Math.imul(a^text.charCodeAt(i),16777619); b=Math.imul(b,33)^text.charCodeAt(i); }
+    const base='legacy_'+(a>>>0).toString(36)+'_'+(b>>>0).toString(36);
+    let id=base,n=0;
+    while(reserved.has(id)) id=base+'_'+(++n);
+    item.id=id; reserved.add(id); seen.add(id);
+  }
+}
+function ensureMonthRowIds(md){
+  ensureRowIds(md.expenses||[]); ensureRowIds(md.credits||[]);
 }
 // PIN state
 let pinEntry='';
@@ -314,11 +387,13 @@ function getMD(y,m){
   if(!DB[k].credits) DB[k].credits=[];
   if(!DB[k].skips)   DB[k].skips={};
   if(!DB[k].overrides) DB[k].overrides={};
+  ensureMonthRowIds(DB[k]);
   return DB[k];
 }
 async function saveMD(y=Y,m=M){
   const k=mk(y,m);
   const data=DB[k];
+  ensureMonthRowIds(data);
   // localStorage cache
   _cacheSet(k,JSON.stringify(data));
   // Firebase — serialize the entire month as a JSON string in a single field
@@ -402,6 +477,7 @@ function startListeners(){
     PSUBS=data.subs||{'1':[],'2':[]};
     persSubOpen=data.subOpen||{'1':true,'2':true};
     _cacheSet('pers_meta',JSON.stringify({subs:PSUBS,subOpen:persSubOpen}));
+    if(document.getElementById('pers-overlay').classList.contains('open')) renderPersonal();
   });
 
   // Listen to family members (live list)
@@ -451,6 +527,39 @@ function listenCurrentMonth(){
 ════════════════════════════════════════════════ */
 function hasCost(v){ return v!==undefined && v!==null && v!==''; }
 function sameCost(a,b){ return hasCost(a)&&hasCost(b) ? Number(a)===Number(b) : !hasCost(a)&&!hasCost(b); }
+function validRecurringMonth(value){ return typeof value==='string'&&/^\d{4}-(0[1-9]|1[0-2])$/.test(value); }
+function recursInMonth(t,y,m){
+  const month=mk(y,m);
+  return (!validRecurringMonth(t.startMonth)||month>=t.startMonth)&&
+    (!validRecurringMonth(t.endMonth)||month<=t.endMonth);
+}
+function creditInMonth(c,y,m,templates=RECUR){
+  const t=c.recurCreditId&&templates.find(t=>c.recurCreditId==='rc_'+t.id||c.recurCreditId==='rpc_'+t.id);
+  return !t||recursInMonth(t,y,m);
+}
+function monthCreditTotal(md,y,m,templates=RECUR){
+  return (md.credits||[]).reduce((sum,c)=>sum+(creditInMonth(c,y,m,templates)?parseFloat(c.amount)||0:0),0);
+}
+function recurringPeriodFields(t,who,i){
+  return `<div class="recur-field"><label>First Month</label>
+    <input type="month" value="${esc(t.startMonth||'')}" max="${esc(t.endMonth||'')}" aria-label="First month" onblur="setRecurringBoundary('${who}',${i},'startMonth',this.value)"></div>
+    <div class="recur-field"><label>Last Payment Month</label>
+    <input type="month" value="${esc(t.endMonth||'')}" min="${esc(t.startMonth||'')}" aria-label="Last payment month" onblur="setRecurringBoundary('${who}',${i},'endMonth',this.value)"></div>`;
+}
+function setRecurringBoundary(who,i,field,value){
+  const personal=who!=='main', templates=personal?PSUBS[who]:RECUR;
+  const t=templates&&templates[i];
+  if(!t||!['startMonth','endMonth'].includes(field)) return false;
+  const refresh=()=>personal?renderPersonal():render();
+  if(value&&!validRecurringMonth(value)){ showToast('Choose a valid month');refresh();return false; }
+  const start=field==='startMonth'?value:t.startMonth, end=field==='endMonth'?value:t.endMonth;
+  if(start&&end&&start>end){ showToast('Last payment month must be on or after the first month');refresh();return false; }
+  if((t[field]||'')===value) return true;
+  if(value) t[field]=value; else delete t[field];
+  if(personal){ savePMeta();seedPersonalMonth(who,PY,PM); } else { saveMeta();seedMonth(Y,M); }
+  refresh();
+  return true;
+}
 function usualCost(t,y,m){
   const month=mk(y,m);
   let amount=t.amount??'', latest='';
@@ -479,6 +588,7 @@ function recurringOverride(t,e,md){
   return e && hasCost(e.amount) && !sameCost(e.amount,baseline) ? e.amount : '';
 }
 function recurringCost(t,e,md,y,m){
+  if(!recursInMonth(t,y,m)) return '0';
   const override=recurringOverride(t,e,md);
   return hasCost(override) ? override : usualCost(t,y,m);
 }
@@ -502,6 +612,7 @@ function syncSeedCost(e,t,md,y,m){
   return changed;
 }
 function recurMonthTotal(t,md,y,m){
+  if(!recursInMonth(t,y,m)) return 0;
   const multi=t.frequency==='weekly'||t.frequency==='biweekly';
   const ids=multi ? getRecurDates(t,y,m).map((_,i)=>t.id+'_'+i) : [t.id];
   return ids.reduce((total,id)=>{
@@ -513,7 +624,7 @@ function seedMonth(y,m){
   const md=getMD(y,m);
   let changed=false;
   for(const t of RECUR){
-    if(!t.active) continue;
+    if(!t.active||!recursInMonth(t,y,m)) continue;
     const freq=t.frequency||'monthly';
 
     if(freq==='monthly'||freq==='annual'||freq==='semiannual'){
@@ -600,7 +711,7 @@ function seedMonth(y,m){
   // Auto-seed credits from recurring charges with creditAmount
   if(!md.credits) md.credits=[];
   for(const t of RECUR){
-    if(!t.active) continue;
+    if(!t.active||!recursInMonth(t,y,m)) continue;
     const creditId='rc_'+t.id;
     const sk=md.skips&&(md.skips[t.id]);
     if(!t.creditAmount || !t.creditTo || sk){
@@ -689,7 +800,7 @@ function covStr(t,y,m){
    Credit: reduces credited person's net responsibility.
    Balance: positive = p2 owes p1; negative = p1 owes p2.
 ════════════════════════════════════════════════ */
-function calcMonth(y,m){
+function calcMonth(y,m,applyCredits=true){
   // Cards show total dollars actually paid out, after credits.
   // Balance = net1 - net2: positive means p2 owes p1, negative means p1 owes p2.
   // Joint expenses: payer paid full amount (goes into their total).
@@ -707,6 +818,8 @@ function calcMonth(y,m){
 
   let cred1=0, cred2=0;
   for(const c of (md.credits||[])){
+    if(!applyCredits) continue;
+    if(!creditInMonth(c,y,m)) continue;
     const a=parseFloat(c.amount)||0;
     if(c.to==='1') cred1+=a;
     else if(c.to==='2') cred2+=a;
@@ -721,29 +834,30 @@ function calcMonth(y,m){
 }
 
 
-function getCarry(y,m){
+function getCarry(y,m,applyCredits=true){
   const cur=mk(y,m);
   let carry=0;
   for(const k of Object.keys(DB).sort()){
     if(k>=cur) continue;
     const md=DB[k]; if(!md||md.settled) continue;
     const[yr,mo]=k.split('-');
-    carry+=calcMonth(parseInt(yr),parseInt(mo)-1).balance;
+    carry+=calcMonth(parseInt(yr),parseInt(mo)-1,applyCredits).balance;
   }
   return carry;
 }
-function getCarryByKey(k){
+function getCarryByKey(k,applyCredits=true){
   const[yr,mo]=k.split('-');
-  return getCarry(parseInt(yr),parseInt(mo)-1);
+  return getCarry(parseInt(yr),parseInt(mo)-1,applyCredits);
 }
 
 /* ════════════════════════════════════════════════
    RENDER
 ════════════════════════════════════════════════ */
 function render(){
+  renderViewPrefs();
   const md=getMD(Y,M);
-  const r=calcMonth(Y,M);
-  const carry=getCarry(Y,M);
+  const r=calcMonth(Y,M,viewPrefs.applyCredits);
+  const carry=getCarry(Y,M,viewPrefs.applyCredits);
   const comb=r.balance+carry;
 
   document.getElementById('monthLabel').textContent=`${MO[M]} ${Y}`;
@@ -802,8 +916,10 @@ function renderRecur(){
   const tbody=document.getElementById('r-tbody');
   tbody.innerHTML='';
   let cnt=0,tot=0;
-  for(const idx of _collapsedRecur){ if(idx>=RECUR.length) _collapsedRecur.delete(idx); }
+  prepareCollapsedRows('recur',RECUR);
   RECUR.forEach((t,i)=>{
+    const inRange=recursInMonth(t,Y,M);
+    if(!inRange&&!document.getElementById('show-ended').checked) return;
     const sk=!!(md.skips&&md.skips[t.id]);
     const freq=t.frequency||'monthly';
     const seeded=md.expenses.find(e=>e.recurId===t.id||e.recurParent===t.id);
@@ -811,25 +927,27 @@ function renderRecur(){
     const usual=usualCost(t,Y,M);
     const disp=hasCost(ov)?ov:usual;
     const moTotal=recurMonthTotal(t,md,Y,M);
-    if(t.active&&!sk){
+    if(t.active&&!sk&&inRange){
       cnt++;
       tot+=moTotal;
     }
-    const collapsed=_collapsedRecur.has(i);
+    const key=rowCollapseKey('recur',t), collapsed=_collapsedRecur.has(key);
     const covLabel=buildCovLabel(t);
     const occ=freq==='weekly'||freq==='biweekly'?getRecurDates(t,Y,M).length:(freq==='annual'||freq==='semiannual'?1:1);
-    const rowClass=!t.active?'ri':sk?'rskip':'';
+    const rowClass=!inRange||!t.active?'ri':sk?'rskip':'';
 
     // Summary row
     const sr=document.createElement('tr');
     sr.className='rsummary-row'+(rowClass?' '+rowClass:'');
+    sr.dataset.collapseKey=key;
     sr.innerHTML=`<td colspan="7"><div style="display:flex;align-items:center;gap:4px;">
       <div class="reorder-arrows">
         <button class="reorder-btn" onclick="reorderRecur(${i},-1)" ${i===0?'disabled style="visibility:hidden"':''} title="Move up">▲</button>
         <button class="reorder-btn" onclick="reorderRecur(${i},1)" ${i===RECUR.length-1?'disabled style="visibility:hidden"':''} title="Move down">▼</button>
       </div>
-      <button class="rexp-toggle" onclick="toggleRowCollapse('recur',${i},this)">${collapsed?'▶':'▼'}</button>
+      <button class="rexp-toggle" onclick="toggleRowCollapse('recur',this)">${collapsed?'▶':'▼'}</button>
       <span contenteditable="true" class="rname-edit" data-placeholder="Enter charge name…" onblur="const _n=this.textContent.trim();setTimeout(()=>updRecur(${i},'name',_n),150)">${esc(t.name||'')}</span>
+      ${!inRange?`<span class="recurring-status">${validRecurringMonth(t.startMonth)&&mk(Y,M)<t.startMonth?'Upcoming':'Ended'}</span>`:''}
       ${t.notes?'<span class="ec-note" style="color:var(--rv);">'+esc(t.notes)+'</span>':''}
       <span class="rsum">${fmt(moTotal)}${freq==='weekly'||freq==='biweekly'?' ('+occ+'×)':freq==='annual'?' (annual)':freq==='semiannual'?' (every 6 mo)':''}</span>
       <button class="del-btn" onclick="confirmDel(this,()=>delRecur(${i}))" style="margin-left:4px;" title="Delete">✕</button>
@@ -937,6 +1055,7 @@ function renderRecur(){
                 ${(t.activeMonths||[1,1,1,1,1,1,1,1,1,1,1,1]).map((on,mi)=>`<button type="button" class="mo-btn ${on?'on':''} ${mi===M?'curr-mo':''}" onclick="toggleActiveMo('${esc(t.id)}',${i},${mi})" title="${MO[mi]}">${MOS[mi][0]}</button>`).join('')}
               </div>
             </div>
+            ${recurringPeriodFields(t,'main',i)}
             <div class="recur-field">
               <label>Notes</label>
               <input class="recur-note-input" type="text" value="${esc(t.notes||'')}" placeholder="Optional note…" onchange="updRecurImm(${i},'notes',this.value)">
@@ -974,23 +1093,25 @@ function renderCredits(){
   const tbody=document.getElementById('c-tbody');
   const empty=document.getElementById('c-empty');
   tbody.innerHTML='';
-  let tot=0;
-  const credLen=(md.credits||[]).length;
-  for(const idx of _collapsedCred){ if(idx>=credLen) _collapsedCred.delete(idx); }
+  let tot=0,cnt=0;
+  prepareCollapsedRows('cred',md.credits);
   (md.credits||[]).forEach((c,i)=>{
+    if(!creditInMonth(c,Y,M)) return;
+    cnt++;
     tot+=parseFloat(c.amount)||0;
-    const collapsed=_collapsedCred.has(i);
+    const key=rowCollapseKey('cred',c), collapsed=_collapsedCred.has(key);
     const isAuto=!!c.recurCreditId;
 
     // Summary row
     const sr=document.createElement('tr');
     sr.className='ec-summary-row';
+    sr.dataset.collapseKey=key;
     sr.innerHTML=`<td colspan="7"><div style="display:flex;align-items:center;gap:4px;">
       <div class="reorder-arrows">
         <button class="reorder-btn" onclick="reorderCredit(${i},-1)" ${i===0?'disabled style="visibility:hidden"':''} title="Move up">▲</button>
         <button class="reorder-btn" onclick="reorderCredit(${i},1)" ${i===(md.credits||[]).length-1?'disabled style="visibility:hidden"':''} title="Move down">▼</button>
       </div>
-      <button class="ec-toggle" onclick="toggleRowCollapse('cred',${i},this)">${collapsed?'▶':'▼'}</button>
+      <button class="ec-toggle" onclick="toggleRowCollapse('cred',this)">${collapsed?'▶':'▼'}</button>
       ${isAuto?'<span style="font-size:.55rem;font-weight:700;color:var(--cv);background:var(--cbg);border:1px solid var(--cb);border-radius:4px;padding:1px 5px;">AUTO</span>':''}
       <span contenteditable="true" class="ec-name-edit" data-placeholder="Enter credit description…" onblur="const _d=this.textContent.trim();setTimeout(()=>updCredit(${i},'desc',_d),150)">${esc(c.desc||'')}</span>
       <span style="font-family:'DM Mono',monospace;font-size:.82rem;color:var(--cv);margin-left:auto;">${fmt(parseFloat(c.amount)||0)}</span>
@@ -1025,7 +1146,6 @@ function renderCredits(){
       <td><input type="text" value="${esc(c.notes||'')}" placeholder="Optional note…" onchange="updCredit(${i},'notes',this.value)" style="min-width:100px"></td>`;
     tbody.appendChild(dr);
   });
-  const cnt=(md.credits||[]).length;
   document.getElementById('c-count').textContent=cnt;
   document.getElementById('c-total').textContent=fmt(tot);
   empty.style.display=cnt===0?'block':'none';
@@ -1039,8 +1159,7 @@ function renderExpenses(){
   const empty=document.getElementById('e-empty');
   tbody.innerHTML='';
   const oneOff=md.expenses.filter(e=>!e.recurId);
-  // Prune stale collapsed indices
-  for(const idx of _collapsedExp){ if(idx>=oneOff.length) _collapsedExp.delete(idx); }
+  prepareCollapsedRows('exp',oneOff);
   empty.style.display=oneOff.length===0?'block':'none';
   const oneOffTotal=oneOff.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
   const ootEl=document.getElementById('other-total-tag');
@@ -1050,18 +1169,19 @@ function renderExpenses(){
   let expIdx=0;
   md.expenses.forEach((e,i)=>{
     if(e.recurId) return;
-    const collapsed=_collapsedExp.has(expIdx);
+    const key=rowCollapseKey('exp',e), collapsed=_collapsedExp.has(key);
     const eidx=expIdx;
 
     // Summary row — always visible
     const sr=document.createElement('tr');
     sr.className='ec-summary-row';
+    sr.dataset.collapseKey=key;
     sr.innerHTML=`<td colspan="8"><div style="display:flex;align-items:center;gap:4px;">
       <div class="reorder-arrows">
         <button class="reorder-btn" onclick="reorderExp(${i},-1)" ${eidx===0?'disabled style="visibility:hidden"':''} title="Move up">▲</button>
         <button class="reorder-btn" onclick="reorderExp(${i},1)" ${eidx===oneOff.length-1?'disabled style="visibility:hidden"':''} title="Move down">▼</button>
       </div>
-      <button class="ec-toggle" onclick="toggleRowCollapse('exp',${eidx},this)">${collapsed?'▶':'▼'}</button>
+      <button class="ec-toggle" onclick="toggleRowCollapse('exp',this)">${collapsed?'▶':'▼'}</button>
       <span contenteditable="true" class="ec-name-edit" data-placeholder="Enter expense description…" onblur="const _d=this.textContent.trim();setTimeout(()=>updExp(${i},'desc',_d),150)">${esc(e.desc||'')}</span>
       <span style="font-family:'DM Mono',monospace;font-size:.82rem;color:var(--slate);margin-left:auto;">${fmt(parseFloat(e.amount)||0)}</span>
       ${e.notes?'<span class="ec-note">'+esc(e.notes)+'</span>':''}
@@ -1166,23 +1286,24 @@ function renderHistory(){
   // Filter to only months that have data
   const keys=months.filter(k=>DB[k]);
   if(!keys.length){
-    tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--slate);padding:14px;font-family:DM Sans;font-size:.85rem">No history yet.</td></tr>';
+    tbody.innerHTML=`<tr><td colspan="${viewPrefs.showBalances?7:4}" style="text-align:center;color:var(--slate);padding:14px;font-family:DM Sans;font-size:.85rem">No history yet.</td></tr>`;
     return;
   }
   tbody.innerHTML=keys.map(k=>{
     const md=DB[k]; if(!md) return '';
     const[yr,mo]=k.split('-');
-    const r=calcMonth(parseInt(yr),parseInt(mo)-1);
-    const carry=getCarryByKey(k);
+    const r=calcMonth(parseInt(yr),parseInt(mo)-1,viewPrefs.applyCredits);
+    const carry=getCarryByKey(k,viewPrefs.applyCredits);
     const comb=r.balance+carry;
     const abs=Math.abs(comb);
     const owes=comb>0.005?`${name2} owes ${fmt(abs)}`:comb<-0.005?`${name1} owes ${fmt(abs)}`:'Even';
     return`<tr>
       <td style="font-family:DM Sans">${MO[parseInt(mo)-1]} ${yr}</td>
       <td>${fmt(r.net1)}</td><td>${fmt(r.net2)}</td>
-      <td>${owes}</td>
-      <td>${Math.abs(carry)<0.01?'—':fmt(Math.abs(carry))}</td>
-      <td><span class="spill ${md.settled?'s-yes':'s-no'}">${md.settled?'Settled':'Open'}</span></td>
+      <td class="history-total">${fmt(r.total)}</td>
+      <td${viewPrefs.showBalances?'':' hidden'}>${owes}</td>
+      <td${viewPrefs.showBalances?'':' hidden'}>${Math.abs(carry)<0.01?'—':fmt(Math.abs(carry))}</td>
+      <td${viewPrefs.showBalances?'':' hidden'}><span class="spill ${md.settled?'s-yes':'s-no'}">${md.settled?'Settled':'Open'}</span></td>
     </tr>`;
   }).join('');
 }
@@ -1272,11 +1393,12 @@ function hdrAddPersCredit(){
 ════════════════════════════════════════════════ */
 function addRecur(){
   clearExpenseFilter();
-  const t={id:'r'+Date.now(),name:'',paidBy:'1',amount:'',chargeDay:'',
+  const t={id:newItemId('r'),name:'',paidBy:'1',amount:'',chargeDay:'',
     frequency:'monthly',anchorDate:'',creditAmount:'',creditTo:'',
     covStartRef:'curr',covStartDay:'',covEndRef:'next',covEndDay:'',
-    activeMonths:[1,1,1,1,1,1,1,1,1,1,1,1],active:true};
+    activeMonths:[1,1,1,1,1,1,1,1,1,1,1,1],active:true,startMonth:mk(Y,M)};
   RECUR.push(t);
+  expandNewRow('recur',t);
   saveMeta();
   // Reset seeded flag so seedMonth re-runs and picks up the new template cleanly.
   // Avoids double-entry that occurred when manually pushing + Firebase listener firing.
@@ -1408,7 +1530,7 @@ function setOv(id,val){
   // Update badge only — no full table re-render so Actual Cost field keeps focus
   let _cnt=0,_tot=0;
   const _md=getMD(Y,M);
-  RECUR.forEach(t=>{ if(!t.active||((_md.skips||{})[t.id])) return; _cnt++;
+  RECUR.forEach(t=>{ if(!t.active||!recursInMonth(t,Y,M)||((_md.skips||{})[t.id])) return; _cnt++;
     _tot+=recurMonthTotal(t,_md,Y,M); });
   document.getElementById('r-count').textContent=_cnt;
   document.getElementById('r-total').textContent=fmt(_tot)+'/mo';
@@ -1460,7 +1582,8 @@ function clearExpenseFilter(personal=false){
 function addExp(){
   clearExpenseFilter();
   const md=getMD(Y,M); const n=new Date();
-  md.expenses.push({date:`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`,desc:'',cat:CATS[0],paidBy:'1',amount:''});
+  md.expenses.push({id:newItemId(),date:`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`,desc:'',cat:CATS[0],paidBy:'1',amount:''});
+  expandNewRow('exp',md.expenses[md.expenses.length-1]);
   saveMD(); render();
   focusLastInlineName('e-tbody');
 }
@@ -1485,7 +1608,8 @@ function delExp(i){ const md=getMD(Y,M); md.expenses.splice(i,1); saveMD(); rend
 function addCredit(){
   clearExpenseFilter();
   const md=getMD(Y,M); const n=new Date();
-  md.credits.push({date:`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`,desc:'',to:'1',amount:''});
+  md.credits.push({id:newItemId(),date:`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`,desc:'',to:'1',amount:''});
+  expandNewRow('cred',md.credits[md.credits.length-1]);
   saveMD(); render();
   focusLastInlineName('c-tbody');
 }
@@ -1497,14 +1621,17 @@ function updCredit(i,f,v){
     renderCredits();
   } else {
     // Just update the total badge without rebuilding the table
-    const tot=(md.credits||[]).reduce((s,c)=>s+(parseFloat(c.amount)||0),0);
+    const tot=monthCreditTotal(md,Y,M);
     document.getElementById('c-total').textContent=fmt(tot);
-    document.getElementById('c-count').textContent=(md.credits||[]).length;
+    document.getElementById('c-count').textContent=(md.credits||[]).filter(c=>creditInMonth(c,Y,M)).length;
   }
 }
 function delCredit(i){ const md=getMD(Y,M); md.credits.splice(i,1); saveMD(); render(); }
 
-function toggleSettle(){ const md=getMD(Y,M); md.settled=!md.settled; saveMD(); render(); }
+function toggleSettle(){
+  if(!viewPrefs.applyCredits){ showToast('Apply credits before changing settlement status');return; }
+  const md=getMD(Y,M);md.settled=!md.settled;saveMD();render();
+}
 
 /* ── Reorder functions ─────────────────────────── */
 function _swap(arr,i,dir){
@@ -1559,7 +1686,7 @@ function changeMonth(d){
 
 /* partial re-render to preserve focus while typing */
 function partialSummary(){
-  const r=calcMonth(Y,M); const carry=getCarry(Y,M); const comb=r.balance+carry;
+  const r=calcMonth(Y,M,viewPrefs.applyCredits); const carry=getCarry(Y,M,viewPrefs.applyCredits); const comb=r.balance+carry;
   document.getElementById('vp1').textContent=fmt(r.net1);
   document.getElementById('vp2').textContent=fmt(r.net2);
   document.getElementById('vtotal').textContent=fmt(r.net1+r.net2);
@@ -1626,11 +1753,13 @@ function getPMD(who,y,m){
   if(!PDB[who][k].credits) PDB[who][k].credits=[];
   if(!PDB[who][k].skips) PDB[who][k].skips={};
   if(!PDB[who][k].overrides) PDB[who][k].overrides={};
+  ensureMonthRowIds(PDB[who][k]);
   return PDB[who][k];
 }
 async function savePMD(who,y=PY,m=PM){
   const k=mk(y,m);
   const data=PDB[who][k];
+  ensureMonthRowIds(data);
   _cacheSet('p'+who+'_'+k, JSON.stringify(data));
   if(window._fbSet && _familyId){ setSyncing(); const ok=await window._fbSet(_famPath('personal_'+who+'/'+k),{data:JSON.stringify(data)}); ok?setSynced():setSyncError(); }
 }
@@ -1641,7 +1770,7 @@ function seedPersonalMonth(who,y,m){
   const md=getPMD(who,y,m);
   let changed=false;
   for(const t of (PSUBS[who]||[])){
-    if(!t.active) continue;
+    if(!t.active||!recursInMonth(t,y,m)) continue;
     const freq=t.frequency||'monthly';
     // For annual/semiannual, auto-skip in off-months
     if(freq==='annual'||freq==='semiannual'){
@@ -1670,7 +1799,7 @@ function seedPersonalMonth(who,y,m){
   // Auto-seed credits from personal subs with creditAmount
   if(!md.credits) md.credits=[];
   for(const t of (PSUBS[who]||[])){
-    if(!t.active) continue;
+    if(!t.active||!recursInMonth(t,y,m)) continue;
     const creditId='rpc_'+t.id;
     const sk=md.skips&&(md.skips[t.id]);
     if(!t.creditAmount || sk){
@@ -1702,21 +1831,10 @@ function seedPersonalMonth(who,y,m){
 let _persMonthUnsub=null;
 function openPersonal(who){
   persWho=String(who);
+  document.getElementById('ps-show-ended').checked=false;
   const n=new Date(); PY=n.getFullYear(); PM=n.getMonth();
   seedPersonalMonth(persWho,PY,PM);
-  // 3f: Collapse all personal-page rows on each open for scannability.
-  // Within-session toggles still persist; this just resets default on open.
-  _collapsedPRecur.clear(); _collapsedPExp.clear(); _collapsedPCred.clear();
-  const psubs = PSUBS[persWho] || [];
-  for(let i=0;i<psubs.length;i++) _collapsedPRecur.add(i);
-  const pk = mk(PY,PM);
-  const pmd = PDB[persWho] && PDB[persWho][pk];
-  if(pmd){
-    const credLen = (pmd.credits||[]).length;
-    for(let i=0;i<credLen;i++) _collapsedPCred.add(i);
-    const oneOff = (pmd.expenses||[]).filter(e => !e.recurId && !e.recurParent);
-    for(let i=0;i<oneOff.length;i++) _collapsedPExp.add(i);
-  }
+  collapsePersonalRows(persWho);
   document.getElementById('pers-overlay').classList.add('open');
   renderPersonal();
   listenPersMonth();
@@ -1747,6 +1865,7 @@ function persChangeMonth(d){
 
 // ── Render ───────────────────────────────────
 function renderPersonal(){
+  renderViewPrefs();
   const who=persWho;
   const pname=who==='1'?name1:name2;
   const color=who==='1'?'var(--p1)':'var(--p2)';
@@ -1766,32 +1885,35 @@ function renderPersSubs(who){
   const tbody=document.getElementById('ps-sub-tbody');
   tbody.innerHTML='';
   let cnt=0, tot=0;
-  const psubLen=(PSUBS[who]||[]).length;
-  for(const idx of _collapsedPRecur){ if(idx>=psubLen) _collapsedPRecur.delete(idx); }
+  prepareCollapsedRows('precur',PSUBS[who]||[],who);
   (PSUBS[who]||[]).forEach((t,i)=>{
+    const inRange=recursInMonth(t,PY,PM);
+    if(!inRange&&!document.getElementById('ps-show-ended').checked) return;
     const sk=!!(md.skips&&md.skips[t.id]);
     const seeded=md.expenses.find(e=>e.subId===t.id);
     const ov=recurringOverride(t,seeded,md);
     const usual=usualCost(t,PY,PM);
     const disp=hasCost(ov)?ov:usual;
-    if(t.active&&!sk){cnt++;tot+=parseFloat(disp)||0;}
-    const collapsed=_collapsedPRecur.has(i);
+    if(t.active&&!sk&&inRange){cnt++;tot+=parseFloat(disp)||0;}
+    const key=rowCollapseKey('precur',t,who), collapsed=_collapsedPRecur.has(key);
     const covLabel=buildCovLabel(t,PM,PY);
     const pFreq=t.frequency||'monthly';
-    const pDisp=disp;
+    const pDisp=inRange?disp:0;
     const pMoTotal=(pFreq==='weekly')?(parseFloat(pDisp)||0)*4.33:(pFreq==='biweekly')?(parseFloat(pDisp)||0)*2.17:(parseFloat(pDisp)||0);
-    const rowClass=!t.active?'ri':sk?'rskip':'';
+    const rowClass=!inRange||!t.active?'ri':sk?'rskip':'';
 
     // Summary row
     const sr=document.createElement('tr');
     sr.className='rsummary-row'+(rowClass?' '+rowClass:'');
+    sr.dataset.collapseKey=key;
     sr.innerHTML=`<td colspan="6"><div style="display:flex;align-items:center;gap:4px;">
       <div class="reorder-arrows">
         <button class="reorder-btn" onclick="reorderPSub('${who}',${i},-1)" ${i===0?'disabled style="visibility:hidden"':''} title="Move up">▲</button>
         <button class="reorder-btn" onclick="reorderPSub('${who}',${i},1)" ${i===(PSUBS[who]||[]).length-1?'disabled style="visibility:hidden"':''} title="Move down">▼</button>
       </div>
-      <button class="rexp-toggle" onclick="toggleRowCollapse('precur',${i},this)">${collapsed?'▶':'▼'}</button>
+      <button class="rexp-toggle" onclick="toggleRowCollapse('precur',this)">${collapsed?'▶':'▼'}</button>
       <span contenteditable="true" class="rname-edit" data-placeholder="Enter subscription name…" onblur="const _n=this.textContent.trim();setTimeout(()=>{PSUBS['${who}'][${i}].name=_n;savePMeta();},150)">${esc(t.name||'')}</span>
+      ${!inRange?`<span class="recurring-status">${validRecurringMonth(t.startMonth)&&mk(PY,PM)<t.startMonth?'Upcoming':'Ended'}</span>`:''}
       ${t.notes?'<span class="ec-note" style="color:var(--rv);">'+esc(t.notes)+'</span>':''}
       <span class="rsum">${fmt(pMoTotal)}${pFreq==='weekly'||pFreq==='biweekly'?' (≈/mo)':pFreq==='annual'?' (annual)':pFreq==='semiannual'?' (every 6 mo)':''}</span>
       <button class="del-btn" onclick="confirmDel(this,()=>delPSub('${who}',${i}))" style="margin-left:4px;" title="Delete">✕</button>
@@ -1877,6 +1999,7 @@ function renderPersSubs(who){
             </div>
           </div>
           <div class="recur-detail-group">
+            ${recurringPeriodFields(t,who,i)}
             <div class="recur-field">
               <label>Notes</label>
               <input class="recur-note-input" type="text" value="${esc(t.notes||'')}" placeholder="Optional note…" onchange="updPSub('${who}',${i},'notes',this.value)">
@@ -1905,24 +2028,25 @@ function renderPersExps(who){
   const empty=document.getElementById('ps-exp-empty');
   tbody.innerHTML='';
   const oneOff=md.expenses.filter(e=>!e.isSubSeed);
-  for(const idx of _collapsedPExp){ if(idx>=oneOff.length) _collapsedPExp.delete(idx); }
+  prepareCollapsedRows('pexp',oneOff,who);
   empty.style.display=oneOff.length===0?'block':'none';
   const pecEl=document.getElementById('ps-exp-cnt');
   if(pecEl) pecEl.textContent=oneOff.length;
   let pExpIdx=0;
   md.expenses.forEach((e,ei)=>{
     if(e.isSubSeed) return;
-    const collapsed=_collapsedPExp.has(pExpIdx);
+    const key=rowCollapseKey('pexp',e,who), collapsed=_collapsedPExp.has(key);
     const pidx=pExpIdx;
 
     const sr=document.createElement('tr');
     sr.className='ec-summary-row';
+    sr.dataset.collapseKey=key;
     sr.innerHTML=`<td colspan="7"><div style="display:flex;align-items:center;gap:4px;">
       <div class="reorder-arrows">
         <button class="reorder-btn" onclick="reorderPExp('${who}',${ei},-1)" ${pidx===0?'disabled style="visibility:hidden"':''} title="Move up">▲</button>
         <button class="reorder-btn" onclick="reorderPExp('${who}',${ei},1)" ${pidx===oneOff.length-1?'disabled style="visibility:hidden"':''} title="Move down">▼</button>
       </div>
-      <button class="ec-toggle" onclick="toggleRowCollapse('pexp',${pidx},this)">${collapsed?'▶':'▼'}</button>
+      <button class="ec-toggle" onclick="toggleRowCollapse('pexp',this)">${collapsed?'▶':'▼'}</button>
       <span contenteditable="true" class="ec-name-edit" data-placeholder="Enter expense description…" onblur="const _d=this.textContent.trim();setTimeout(()=>updPExp('${who}',${ei},'desc',_d),150)">${esc(e.desc||'')}</span>
       <span style="font-family:'DM Mono',monospace;font-size:.82rem;color:var(--slate);margin-left:auto;">${fmt(parseFloat(e.amount)||0)}</span>
       ${e.notes?'<span class="ec-note">'+esc(e.notes)+'</span>':''}
@@ -1966,7 +2090,7 @@ function updatePersTotals(who){
   // sub total from templates (active + not skipped, with any override)
   let subTot=0;
   (PSUBS[who]||[]).forEach(t=>{
-    if(!t.active) return;
+    if(!t.active||!recursInMonth(t,PY,PM)) return;
     if(md.skips&&md.skips[t.id]) return;
     const seeded=md.expenses.find(e=>e.subId===t.id);
     subTot+=parseFloat(recurringCost(t,seeded,md,PY,PM))||0;
@@ -1974,12 +2098,12 @@ function updatePersTotals(who){
   // other expenses total
   const expTot=md.expenses.filter(e=>!e.isSubSeed).reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
   // credits total
-  const credTot=(md.credits||[]).reduce((s,c)=>s+(parseFloat(c.amount)||0),0);
+  const credTot=monthCreditTotal(md,PY,PM,PSUBS[who]||[]);
   document.getElementById('ps-sub-total').textContent=fmt(subTot);
   document.getElementById('ps-exp-total').textContent=fmt(expTot);
   const pstag=document.getElementById('ps-exp-tag'); if(pstag) pstag.textContent=fmt(expTot);
   document.getElementById('ps-cred-total').textContent=fmt(credTot);
-  document.getElementById('ps-grand-total').textContent=fmt(Math.max(0, subTot+expTot-credTot));
+  document.getElementById('ps-grand-total').textContent=fmt(Math.max(0, subTot+expTot-(viewPrefs.applyCredits?credTot:0)));
 }
 
 function renderPersHist(who){
@@ -2003,20 +2127,20 @@ function renderPersHist(who){
     // Calculate sub total from seeded expenses, respecting skips
     let subTot=0;
     (PSUBS[who]||[]).forEach(t=>{
-      if(!t.active) return;
+      if(!t.active||!recursInMonth(t,parseInt(yr),m)) return;
       if(md.skips&&md.skips[t.id]) return;
       const seeded=(md.expenses||[]).find(e=>e.subId===t.id);
       const amt=recurringCost(t,seeded,md,parseInt(yr),m);
       subTot+=parseFloat(amt)||0;
     });
     const expTot=(md.expenses||[]).filter(e=>!e.isSubSeed).reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
-    const credTot=(md.credits||[]).reduce((s,c)=>s+(parseFloat(c.amount)||0),0);
+    const credTot=monthCreditTotal(md,parseInt(yr),m,PSUBS[who]||[]);
     return`<tr>
       <td style="font-family:DM Sans">${MO[m]} ${yr}</td>
       <td>${fmt(subTot)}</td>
       <td>${fmt(expTot)}</td>
-      <td style="color:var(--cv)">${credTot>0?'-':''}${fmt(credTot)}</td>
-      <td>${fmt(Math.max(0, subTot+expTot-credTot))}</td>
+      <td style="color:var(--cv)">${viewPrefs.applyCredits&&credTot>0?'-':''}${fmt(credTot)}</td>
+      <td>${fmt(Math.max(0, subTot+expTot-(viewPrefs.applyCredits?credTot:0)))}</td>
     </tr>`;
   }).join('');
 }
@@ -2030,10 +2154,11 @@ function togglePersZone(){
 function addPersSub(){
   clearExpenseFilter(true);
   if(!PSUBS[persWho]) PSUBS[persWho]=[];
-  PSUBS[persWho].push({id:'ps'+Date.now(),name:'',amount:'',notes:'',active:true,
+  PSUBS[persWho].push({id:newItemId('ps'),name:'',amount:'',notes:'',active:true,
     frequency:'monthly',anchorDate:'',creditAmount:'',
     chargeDay:'',covStartRef:'curr',covStartDay:'',covEndRef:'next',covEndDay:'',
-    activeMonths:[1,1,1,1,1,1,1,1,1,1,1,1]});
+    activeMonths:[1,1,1,1,1,1,1,1,1,1,1,1],startMonth:mk(PY,PM)});
+  expandNewRow('precur',PSUBS[persWho][PSUBS[persWho].length-1],persWho);
   savePMeta();
   seedPersonalMonth(persWho,PY,PM);
   renderPersSubs(persWho); renderPersHist(persWho);
@@ -2120,9 +2245,11 @@ function addPersExp(){
   clearExpenseFilter(true);
   const md=getPMD(persWho,PY,PM); const n=new Date();
   md.expenses.push({
+    id:newItemId(),
     date:`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`,
     desc:'',cat:CATS[0],amount:'',notes:''
   });
+  expandNewRow('pexp',md.expenses[md.expenses.length-1],persWho);
   savePMD(persWho); renderPersExps(persWho);
   focusLastInlineName('ps-exp-tbody');
 }
@@ -2159,21 +2286,24 @@ function renderPersCredits(who){
   const tbody=document.getElementById('ps-c-tbody');
   const empty=document.getElementById('ps-c-empty');
   tbody.innerHTML='';
-  let tot=0;
-  for(const idx of _collapsedPCred){ if(idx>=md.credits.length) _collapsedPCred.delete(idx); }
+  let tot=0,cnt=0;
+  prepareCollapsedRows('pcred',md.credits,who);
   md.credits.forEach((c,i)=>{
+    if(!creditInMonth(c,PY,PM,PSUBS[who]||[])) return;
+    cnt++;
     tot+=parseFloat(c.amount)||0;
-    const collapsed=_collapsedPCred.has(i);
+    const key=rowCollapseKey('pcred',c,who), collapsed=_collapsedPCred.has(key);
     const isAuto=!!c.recurCreditId;
 
     const sr=document.createElement('tr');
     sr.className='ec-summary-row';
+    sr.dataset.collapseKey=key;
     sr.innerHTML=`<td colspan="6"><div style="display:flex;align-items:center;gap:4px;">
       <div class="reorder-arrows">
         <button class="reorder-btn" onclick="reorderPCredit('${who}',${i},-1)" ${i===0?'disabled style="visibility:hidden"':''} title="Move up">▲</button>
         <button class="reorder-btn" onclick="reorderPCredit('${who}',${i},1)" ${i===md.credits.length-1?'disabled style="visibility:hidden"':''} title="Move down">▼</button>
       </div>
-      <button class="ec-toggle" onclick="toggleRowCollapse('pcred',${i},this)">${collapsed?'▶':'▼'}</button>
+      <button class="ec-toggle" onclick="toggleRowCollapse('pcred',this)">${collapsed?'▶':'▼'}</button>
       ${isAuto?'<span style="font-size:.55rem;font-weight:700;color:var(--cv);background:var(--cbg);border:1px solid var(--cb);border-radius:4px;padding:1px 5px;">AUTO</span>':''}
       <span contenteditable="true" class="ec-name-edit" data-placeholder="Enter credit description…" onblur="const _d=this.textContent.trim();setTimeout(()=>updPersCredit('${who}',${i},'desc',_d),150)">${esc(c.desc||'')}</span>
       <span style="font-family:'DM Mono',monospace;font-size:.82rem;color:var(--cv);margin-left:auto;">${fmt(parseFloat(c.amount)||0)}</span>
@@ -2202,7 +2332,6 @@ function renderPersCredits(who){
       <td><input type="text" value="${esc(c.notes||'')}" placeholder="Optional note…" onchange="updPersCredit('${who}',${i},'notes',this.value)"></td>`;
     tbody.appendChild(dr);
   });
-  const cnt=md.credits.length;
   document.getElementById('ps-c-count').textContent=cnt;
   document.getElementById('ps-c-total').textContent=fmt(tot);
   document.getElementById('ps-cred-total').textContent=fmt(tot);
@@ -2221,16 +2350,17 @@ function addPersCredit(){
   const md=getPMD(persWho,PY,PM);
   if(!md.credits) md.credits=[];
   const n=new Date();
-  md.credits.push({date:`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`,desc:'',amount:'',notes:''});
+  md.credits.push({id:newItemId(),date:`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`,desc:'',amount:'',notes:''});
+  expandNewRow('pcred',md.credits[md.credits.length-1],persWho);
   savePMD(persWho); renderPersCredits(persWho);
   focusLastInlineName('ps-c-tbody');
 }
 function updPersCredit(who,i,f,v){
   const md=getPMD(who,PY,PM); md.credits[i][f]=v; savePMD(who);
   if(f==='amount'){
-    const tot=(md.credits||[]).reduce((s,c)=>s+(parseFloat(c.amount)||0),0);
+    const tot=monthCreditTotal(md,PY,PM,PSUBS[who]||[]);
     document.getElementById('ps-c-total').textContent=fmt(tot);
-    document.getElementById('ps-c-count').textContent=(md.credits||[]).length;
+    document.getElementById('ps-c-count').textContent=(md.credits||[]).filter(c=>creditInMonth(c,PY,PM,PSUBS[who]||[])).length;
     document.getElementById('ps-cred-total').textContent=fmt(tot);
     updatePersTotals(who); renderPersHist(who);
   } else {
@@ -2255,22 +2385,22 @@ function isValidInviteEmail(email){
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-function toggleRowCollapse(type,idx,btn){
-  const sets={recur:_collapsedRecur,exp:_collapsedExp,cred:_collapsedCred,precur:_collapsedPRecur,pexp:_collapsedPExp,pcred:_collapsedPCred};
-  const s=sets[type];
+function toggleRowCollapse(type,btn){
+  const s=rowCollapseSet(type);
   if(!s) return;
   const summaryRow=btn.closest('tr');
+  const key=summaryRow.dataset.collapseKey;
+  if(!key) return;
   const detailRow=summaryRow.nextElementSibling;
-  if(s.has(idx)){
-    s.delete(idx);
+  if(s.has(key)){
+    s.delete(key);
     if(detailRow) detailRow.classList.remove('ec-hidden','r-hidden');
     btn.textContent='▼';
   } else {
-    s.add(idx);
+    s.add(key);
     if(detailRow) detailRow.classList.add(type==='recur'||type==='precur'?'r-hidden':'ec-hidden');
     btn.textContent='▶';
   }
-  _saveCollapsed();
 }
 
 let toastTimer;
@@ -2312,6 +2442,9 @@ function runDevTests(){
     const r=calcMonth(2026,3);
     assert('calcMonth paid totals', approx(r.paid1,140)&&approx(r.paid2,50), JSON.stringify(r));
     assert('calcMonth credit nets', approx(r.net1,115)&&approx(r.net2,45)&&approx(r.balance,70), JSON.stringify(r));
+    const gross=calcMonth(2026,3,false);
+    assert('credits-off preview preserves gross amounts', approx(gross.net1,140)&&approx(gross.net2,50));
+    assert('credits-off preview does not change canonical credit calculations', approx(calcMonth(2026,3).net1,115));
     DB['2026-04'].skips={r1:true};
     const skipped=calcMonth(2026,3);
     assert('calcMonth excludes skipped recurring', approx(skipped.paid1,100)&&approx(skipped.net1,75)&&approx(skipped.balance,30), JSON.stringify(skipped));
@@ -2334,6 +2467,22 @@ function runDevTests(){
     assert('dated cost is respected in totals', calcMonth(2026,9).total===14);
     const restoredPrice=JSON.parse(JSON.stringify(price));
     assert('price history survives JSON round trip', usualCost(restoredPrice,2026,7)==='13'&&usualCost(restoredPrice,2027,0)==='17');
+    const rows=[{desc:'Duplicate',amount:'10'},{desc:'Duplicate',amount:'10'},{id:'kept',amount:'20'}];
+    ensureRowIds(rows);
+    assert('legacy rows get distinct IDs without replacing valid IDs', new Set(rows.map(e=>e.id)).size===3&&rows[2].id==='kept');
+    const rowIds=JSON.stringify(rows.map(e=>e.id));
+    rows[0].amount='15';ensureRowIds(rows);
+    assert('row IDs survive edits and JSON round trips', JSON.stringify(rows.map(e=>e.id))===rowIds&&JSON.parse(JSON.stringify(rows))[0].id===rows[0].id);
+    const key=rowCollapseKey('exp',rows[0]);M++;
+    assert('transaction collapse keys are month scoped', key!==rowCollapseKey('exp',rows[0]));M--;
+    const recurKey=rowCollapseKey('recur',{id:'r1'});M++;
+    assert('recurring collapse keys are month scoped', recurKey!==rowCollapseKey('recur',{id:'r1'}));M--;
+    assert('personal collapse keys are person scoped', rowCollapseKey('pexp',rows[0],'1')!==rowCollapseKey('pexp',rows[0],'2'));
+    const lifetime={id:'lifetime-test',amount:'40',startMonth:'2026-09',endMonth:'2026-12'};
+    assert('recurring first and last months are inclusive', recursInMonth(lifetime,2026,8)&&recursInMonth(lifetime,2026,11));
+    assert('recurring lifetime crosses years without restarting', !recursInMonth(lifetime,2026,7)&&!recursInMonth(lifetime,2027,0));
+    assert('ended recurring charge ignores even a saved override', recurringCost(lifetime,null,{overrides:{'lifetime-test':'99'}},2027,0)==='0');
+    assert('ended auto-credit is excluded but manual refund remains', !creditInMonth({recurCreditId:'rc_lifetime-test'},2027,0,[lifetime])&&creditInMonth({amount:'5'},2027,0,[lifetime]));
     console.table(results);
     showToast('Dev tests passed');
     return true;
@@ -2387,6 +2536,8 @@ function exportCSV(){
       const isRecur = !!e.recurId;
       const skipped = isRecur && md.skips && (md.skips[e.recurId]||md.skips[e.recurParent]) ? 'yes' : '';
       const [yr,mo]=k.split('-').map(Number);
+      const source=RECUR.find(t=>t.id===(e.recurParent||e.recurId));
+      if(source&&!recursInMonth(source,yr,mo-1)) return;
       const amt=expenseAmount(e,md,yr,mo-1);
       rows.push([
         isRecur?'Recurring':'Expense', 'Joint', k, e.date||'', e.desc||'',
@@ -2394,6 +2545,8 @@ function exportCSV(){
       ]);
     });
     (md.credits||[]).forEach(c => {
+      const [yr,mo]=k.split('-').map(Number);
+      if(!creditInMonth(c,yr,mo-1)) return;
       rows.push([
         'Credit','Joint',k,c.date||'',c.desc||'','',nameOf(c.to),c.payment||'',
         (parseFloat(c.amount)||0).toFixed(2), c.notes||'', ''
@@ -2412,6 +2565,8 @@ function exportCSV(){
         const isSub = !!e.isSubSeed;
         const skipped = isSub && md.skips && md.skips[e.subId] ? 'yes' : '';
         const [yr,mo]=k.split('-').map(Number);
+        const source=(PSUBS[who]||[]).find(t=>t.id===e.subId);
+        if(source&&!recursInMonth(source,yr,mo-1)) return;
         const amt=expenseAmount(e,md,yr,mo-1,PSUBS[who]||[]);
         rows.push([
           isSub?'Subscription':'Expense', pname, k, e.date||'', e.desc||'',
@@ -2419,6 +2574,8 @@ function exportCSV(){
         ]);
       });
       (md.credits||[]).forEach(c => {
+        const [yr,mo]=k.split('-').map(Number);
+        if(!creditInMonth(c,yr,mo-1,PSUBS[who]||[])) return;
         rows.push([
           'Credit',pname,k,c.date||'',c.desc||'','',pname,c.payment||'',
           (parseFloat(c.amount)||0).toFixed(2), c.notes||'', ''
@@ -2840,6 +2997,10 @@ async function clearInvalidFamilyAccess(fid, uid, opts={}){
   if(_familyId===fid) _familyId=null;
   DB={}; PDB={'1':{},'2':{}};
   RECUR=[]; PSUBS={'1':[],'2':[]};
+  viewPrefs={showBalances:false,applyCredits:true};
+  resetCollapseState();renderViewPrefs();
+  document.getElementById('show-ended').checked=false;
+  document.getElementById('ps-show-ended').checked=false;
 }
 
 async function recoverKnownFamilyRoute(uid){
@@ -2929,6 +3090,10 @@ async function signOutClick(){
   _isOwner=false;
   DB={}; PDB={'1':{},'2':{}};
   RECUR=[]; PSUBS={'1':[],'2':[]};
+  viewPrefs={showBalances:false,applyCredits:true};
+  resetCollapseState();renderViewPrefs();
+  document.getElementById('show-ended').checked=false;
+  document.getElementById('ps-show-ended').checked=false;
   name1='Person 1'; name2='Person 2';
   rOpen=true; cOpen=false; eOpen=true;
   persSubOpen={'1':true,'2':true};
@@ -2956,6 +3121,7 @@ let _dataLoadPromise = null;
 
 async function startDataLoad(){
   _dataLoaded = false;
+  loadViewPrefs();
   _dataLoadPromise = (async () => {
     await loadAll();
     await loadPersonal();

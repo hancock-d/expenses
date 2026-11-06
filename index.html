@@ -159,7 +159,7 @@ window._authSignOut  = () => signOut(auth);
 
 window.dispatchEvent(new Event('fb-ready'));
 </script>
-<link rel="stylesheet" href="styles.css?v=2.5.0">
+<link rel="stylesheet" href="styles.css?v=2.6.1">
 </head>
 <body>
 
@@ -295,23 +295,27 @@ window.dispatchEvent(new Event('fb-ready'));
     </div>
 
     <!-- Summary -->
-    <div class="summary-bar">
+    <div class="view-options" aria-label="Summary options">
+      <label><input id="show-balances" type="checkbox" onchange="setViewPref('showBalances',this.checked)"> Show balances</label>
+      <label><input id="apply-credits" type="checkbox" checked onchange="setViewPref('applyCredits',this.checked)"> Apply credits</label>
+    </div>
+    <div class="summary-bar without-balances" id="joint-summary">
       <div class="card p1c pers-card" onclick="openPersonal(1)" title="View personal tracker">
         <div class="card-label" id="lbl1">Person 1</div>
         <div class="card-value" id="vp1">$0.00</div>
-        <div class="card-sub">total, after credits <span class="tap-hint">tap to open ›</span></div>
+        <div class="card-sub"><span id="p1-credit-basis">total, after credits</span> <span class="tap-hint">tap to open ›</span></div>
       </div>
       <div class="card p2c pers-card" onclick="openPersonal(2)" title="View personal tracker">
         <div class="card-label" id="lbl2">Person 2</div>
         <div class="card-value" id="vp2">$0.00</div>
-        <div class="card-sub">total, after credits <span class="tap-hint">tap to open ›</span></div>
+        <div class="card-sub"><span id="p2-credit-basis">total, after credits</span> <span class="tap-hint">tap to open ›</span></div>
       </div>
-      <div class="card">
+      <div class="card combined-card">
         <div class="card-label">Combined Total</div>
         <div class="card-value" id="vtotal">$0.00</div>
-        <div class="card-sub">after credits</div>
+        <div class="card-sub" id="credit-basis">after credits</div>
       </div>
-      <div class="card balc" id="balCard">
+      <div class="card balc" id="balCard" hidden>
         <div class="card-label" id="lblbal">Balance</div>
         <div class="card-value" id="vbal">$0.00</div>
         <div class="carry-badge" id="carry-badge"></div>
@@ -346,6 +350,7 @@ window.dispatchEvent(new Event('fb-ready'));
           </div>
         </div>
         <div class="zcollapse" id="r-body">
+          <div class="recurring-options"><label><input id="show-ended" type="checkbox" onchange="renderRecur()"> Show ended &amp; upcoming</label></div>
           <table class="rtable">
             <thead><tr>
               <th style="width:28px">✓</th>
@@ -443,9 +448,10 @@ window.dispatchEvent(new Event('fb-ready'));
           <th>Month</th>
           <th id="h1">Person 1</th>
           <th id="h2">Person 2</th>
-          <th>Balance</th>
-          <th>Carryover</th>
-          <th>Status</th>
+          <th title="Joint expenses before credits, excluding personal pages and carryover">Total Expenses</th>
+          <th id="balance-history-head" hidden>Balance</th>
+          <th id="carry-history-head" hidden>Carryover</th>
+          <th id="status-history-head" hidden>Status</th>
         </tr></thead>
         <tbody id="h-tbody"></tbody>
       </table>
@@ -509,6 +515,9 @@ window.dispatchEvent(new Event('fb-ready'));
     <div class="pers-main">
 
       <!-- Summary strip -->
+      <div class="view-options" aria-label="Personal summary options">
+        <label><input id="pers-apply-credits" type="checkbox" checked onchange="setViewPref('applyCredits',this.checked)"> Apply credits</label>
+      </div>
       <div class="summary-bar" style="grid-template-columns:repeat(3,1fr);">
         <div class="card pers-home-card" onclick="closePersonal()" title="Return to joint tracker">
           <div class="card-label">Home</div>
@@ -533,7 +542,7 @@ window.dispatchEvent(new Event('fb-ready'));
         <div class="card" style="grid-column:1/-1;">
           <div class="card-label">Total This Month</div>
           <div class="card-value" id="ps-grand-total">$0.00</div>
-          <div class="card-sub">all personal, after credits</div>
+          <div class="card-sub" id="pers-credit-basis">all personal, after credits</div>
         </div>
       </div>
 
@@ -561,6 +570,7 @@ window.dispatchEvent(new Event('fb-ready'));
             </div>
           </div>
           <div class="zcollapse open" id="ps-sub-body">
+            <div class="recurring-options"><label><input id="ps-show-ended" type="checkbox" onchange="renderPersSubs(persWho)"> Show ended &amp; upcoming</label></div>
             <table class="rtable">
               <thead><tr>
                 <th style="width:28px">✓</th>
@@ -649,7 +659,7 @@ window.dispatchEvent(new Event('fb-ready'));
             <th>Month</th>
             <th>Subscriptions</th>
             <th>Expenses</th>
-            <th>Credits</th>
+            <th id="ps-history-credit-label">Credits</th>
             <th>Total</th>
           </tr></thead>
           <tbody id="ps-hist-tbody"></tbody>
@@ -663,6 +673,6 @@ window.dispatchEvent(new Event('fb-ready'));
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=2.5.3"></script>
+<script src="app.js?v=2.6.1"></script>
 </body>
 </html>

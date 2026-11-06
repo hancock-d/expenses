@@ -225,6 +225,12 @@ main{max-width:1100px;margin:0 auto;padding:18px 14px calc(18px + var(--safe-bot
 
 /* ── SUMMARY CARDS ── */
 .summary-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+.view-options{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px 20px;}
+.view-options label{display:inline-flex;align-items:center;gap:6px;min-height:36px;font-size:.8rem;color:var(--slate);cursor:pointer;}
+.view-options input{width:16px;height:16px;accent-color:var(--ink);touch-action:manipulation;}
+.summary-bar.without-balances{grid-template-columns:repeat(3,minmax(0,1fr));}
+.balc[hidden],.htable [hidden]{display:none!important;}
+.settle-btn:disabled{opacity:.5;cursor:not-allowed;}
 .card{background:white;border-radius:12px;padding:14px 16px;box-shadow:var(--sh);border:1px solid var(--border);}
 .card-label{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--slate);margin-bottom:4px;}
 .card-value{font-family:'DM Mono',monospace;font-size:1.35rem;font-weight:500;line-height:1;}
@@ -417,6 +423,12 @@ td.anum input{font-family:'DM Mono',monospace;font-weight:500;text-align:left;}
 .cat-amt{font-family:'DM Mono',monospace;font-size:1rem;font-weight:500;}
 
 /* HISTORY */
+.recurring-options{display:flex;justify-content:flex-end;padding:6px 12px;border-bottom:1px solid var(--rb);}
+.recurring-options label{display:inline-flex;align-items:center;gap:6px;font-size:.75rem;color:var(--rv);cursor:pointer;min-height:28px;}
+.recurring-options input{width:16px;height:16px;accent-color:var(--rv);touch-action:manipulation;}
+.recurring-status{font-size:.65rem;color:var(--slate);flex-shrink:0;}
+.recur-field input[type="month"]{width:100%;min-width:0;max-width:100%;box-sizing:border-box;}
+.history-total{font-weight:700;}
 .hist-section{background:white;border-radius:12px;box-shadow:var(--sh);border:1px solid var(--border);padding:16px;}
 .hist-section h2{font-family:'DM Serif Display',serif;font-size:.95rem;margin-bottom:12px;}
 .htable{width:100%;border-collapse:collapse;}
@@ -447,6 +459,8 @@ td.anum input{font-family:'DM Mono',monospace;font-weight:500;text-align:left;}
   #monthLabel{min-width:110px;font-size:.85rem;}
   main{padding:12px 10px calc(16px + var(--safe-bot));gap:12px;}
   .summary-bar{grid-template-columns:1fr 1fr;gap:8px;}
+  .summary-bar.without-balances{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .without-balances .combined-card{grid-column:1/-1;}
   .card{padding:12px 13px;}
   .card-value{font-size:1.15rem;}
   .card-sub{font-size:.65rem;}
